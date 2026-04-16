@@ -1,8 +1,8 @@
 {
   "name": "nanaban",
-  "version": "3.2.0",
+  "version": "4.0.0",
   "type": "module",
-  "description": "Image generation from the terminal. Two words and you have a picture.",
+  "description": "Image generation from the terminal — Nano Banana (Gemini) and GPT Image via one CLI. One key (Gemini OR OpenRouter) is enough.",
   "bin": {
     "nanaban": "./bin/nanaban.mjs"
   },
@@ -19,6 +19,9 @@
   "keywords": [
     "image-generation",
     "gemini",
+    "openai",
+    "openrouter",
+    "gpt-image",
     "cli",
     "ai",
     "nano-banana",

@@ -52,9 +52,31 @@ describe('agent-info', () => {
     const { stdout } = run(['agent-info']);
     const manifest = JSON.parse(stdout);
     const codes = manifest.error_codes.map((e: any) => e.code);
-    for (const expected of ['AUTH_MISSING', 'AUTH_INVALID', 'AUTH_EXPIRED', 'PROMPT_MISSING', 'IMAGE_NOT_FOUND', 'GENERATION_FAILED', 'RATE_LIMITED', 'NETWORK_ERROR']) {
+    for (const expected of ['AUTH_MISSING', 'AUTH_INVALID', 'AUTH_EXPIRED', 'PROMPT_MISSING', 'IMAGE_NOT_FOUND', 'GENERATION_FAILED', 'RATE_LIMITED', 'NETWORK_ERROR', 'MODEL_NOT_FOUND', 'TRANSPORT_UNAVAILABLE', 'CAPABILITY_UNSUPPORTED']) {
       assert.ok(codes.includes(expected), `missing error code: ${expected}`);
     }
+  });
+
+  it('declares all four models with capabilities', () => {
+    const { stdout } = run(['agent-info']);
+    const manifest = JSON.parse(stdout);
+    assert.ok(Array.isArray(manifest.models));
+    const ids = manifest.models.map((m: any) => m.id);
+    for (const expected of ['nb2', 'nb2-pro', 'gpt5', 'gpt5-mini']) {
+      assert.ok(ids.includes(expected), `missing model: ${expected}`);
+    }
+    const nb2 = manifest.models.find((m: any) => m.id === 'nb2');
+    assert.ok(nb2.capabilities.aspect_ratios.includes('1:8'), 'nb2 should support extended ratios');
+    assert.ok(nb2.capabilities.sizes.includes('0.5K'), 'nb2 should support 0.5K');
+    const pro = manifest.models.find((m: any) => m.id === 'nb2-pro');
+    assert.ok(!pro.capabilities.aspect_ratios.includes('1:8'), 'pro should not have extended ratios');
+  });
+
+  it('declares both transports', () => {
+    const { stdout } = run(['agent-info']);
+    const manifest = JSON.parse(stdout);
+    const ids = manifest.transports.map((t: any) => t.id);
+    assert.deepEqual(ids.sort(), ['gemini-direct', 'openrouter']);
   });
 
   it('lists exit codes 0, 1, 2', () => {
@@ -70,6 +92,7 @@ describe('agent-info', () => {
     const vars = manifest.env_vars.map((v: any) => v.name);
     assert.ok(vars.includes('GEMINI_API_KEY'));
     assert.ok(vars.includes('GOOGLE_API_KEY'));
+    assert.ok(vars.includes('OPENROUTER_API_KEY'));
   });
 
   it('declares config path and format', () => {
