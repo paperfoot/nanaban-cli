@@ -1,7 +1,6 @@
 import { access, writeFile, mkdir } from 'fs/promises';
 import path from 'path';
-import { createClient } from '../core/client.js';
-import { generateImage, parseAspectRatio, parseImageSize, type Model } from '../core/generate.js';
+import { dispatch } from '../core/dispatch.js';
 import { autoName } from '../lib/naming.js';
 import { createOutput, type Output } from '../lib/output.js';
 import { normalizeError, NB2Error } from '../lib/errors.js';
@@ -11,6 +10,8 @@ export interface EditCommandOpts {
   ar: string;
   size: string;
   pro: boolean;
+  model?: string;
+  via?: string;
   neg?: string;
   json: boolean;
   quiet: boolean;
@@ -36,40 +37,39 @@ export async function runEdit(imagePath: string, prompt: string, opts: EditComma
   }
 
   try {
-    const aspectRatio = parseAspectRatio(opts.ar || '1:1');
-    const imageSize = parseImageSize(opts.size || '1k');
-    const model: Model = opts.pro ? 'pro' : 'nb2';
-
     out.spin('Editing image...');
 
-    const { client, auth } = await createClient();
-    out.info(`Auth: ${auth.method} (${auth.detail})`);
-
-    const result = await generateImage(client, {
+    const result = await dispatch({
       mode: 'edit',
-      model,
       prompt,
+      modelName: opts.model,
+      pro: opts.pro,
+      via: opts.via,
+      aspect: opts.ar,
+      size: opts.size,
       negativePrompt: opts.neg,
-      aspectRatio,
-      imageSize,
       referenceImages: [{ source: 'file', path: resolved }],
-    }, process.cwd());
+      basePath: process.cwd(),
+    });
+
+    out.info(`Auth: ${result.authMethod}`);
 
     const dir = process.cwd();
     const filename = opts.output || await autoName(prompt, dir);
     const filePath = path.resolve(dir, filename);
-
     await mkdir(path.dirname(filePath), { recursive: true });
     await writeFile(filePath, result.buffer);
 
     out.stopSpin();
     out.success({
       file: filePath,
-      model: result.model,
+      model: result.modelId,
+      transport: result.transport,
       width: result.width,
       height: result.height,
       sizeBytes: result.buffer.length,
       durationMs: result.durationMs,
+      costUsd: result.costUsd,
     });
 
     if (opts.open) {
@@ -78,8 +78,8 @@ export async function runEdit(imagePath: string, prompt: string, opts: EditComma
     }
   } catch (err) {
     out.stopSpin();
-    const nb2err = normalizeError(err);
-    out.error(nb2err);
-    process.exit(nb2err.exitCode);
+    const nerr = normalizeError(err);
+    out.error(nerr);
+    process.exit(nerr.exitCode);
   }
 }
