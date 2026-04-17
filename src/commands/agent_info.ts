@@ -148,7 +148,7 @@ export function runAgentInfo(): void {
       },
     },
     install: 'npm install -g nanaban',
-    repository: 'https://github.com/199-biotechnologies/nanaban',
+    repository: 'https://github.com/paperfoot/nanaban-cli',
   };
 
   process.stdout.write(JSON.stringify(manifest, null, 2) + '\n');

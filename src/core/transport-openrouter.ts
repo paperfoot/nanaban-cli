@@ -71,7 +71,7 @@ export async function generateViaOpenRouter(
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://github.com/199-biotechnologies/nanaban',
+        'HTTP-Referer': 'https://github.com/paperfoot/nanaban-cli',
         'X-Title': 'nanaban',
       },
       body: JSON.stringify(body),

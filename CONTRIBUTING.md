@@ -5,7 +5,7 @@ Thanks for your interest in contributing. Here is how to get started.
 ## Setup
 
 ```bash
-git clone https://github.com/199-biotechnologies/nanaban.git
+git clone https://github.com/paperfoot/nanaban-cli.git
 cd nanaban
 npm install
 npm link
@@ -43,7 +43,7 @@ bin/
 
 ## Reporting Bugs
 
-Open an issue at [github.com/199-biotechnologies/nanaban/issues](https://github.com/199-biotechnologies/nanaban/issues). Include your Node version, OS, and the command you ran.
+Open an issue at [github.com/paperfoot/nanaban-cli/issues](https://github.com/paperfoot/nanaban-cli/issues). Include your Node version, OS, and the command you ran.
 
 ## License
 

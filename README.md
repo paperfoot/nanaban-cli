@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/199-biotechnologies/nanaban/stargazers"><img src="https://img.shields.io/github/stars/199-biotechnologies/nanaban?style=for-the-badge&logo=github&label=%E2%AD%90%20Star%20this%20repo&color=yellow" alt="Star this repo"></a>
+  <a href="https://github.com/paperfoot/nanaban-cli/stargazers"><img src="https://img.shields.io/github/stars/paperfoot/nanaban-cli?style=for-the-badge&logo=github&label=%E2%AD%90%20Star%20this%20repo&color=yellow" alt="Star this repo"></a>
   &nbsp;
   <a href="https://x.com/longevityboris"><img src="https://img.shields.io/badge/Follow_%40longevityboris-000000?style=for-the-badge&logo=x&logoColor=white" alt="Follow @longevityboris on X"></a>
 </p>
@@ -17,7 +17,7 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/nanaban"><img src="https://img.shields.io/npm/v/nanaban?style=for-the-badge&logo=npm&logoColor=white&label=npm&color=CB3837" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/nanaban"><img src="https://img.shields.io/npm/dm/nanaban?style=for-the-badge&logo=npm&logoColor=white&color=CB3837" alt="npm downloads"></a>
-  <a href="https://github.com/199-biotechnologies/nanaban/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
+  <a href="https://github.com/paperfoot/nanaban-cli/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/nanaban?style=for-the-badge&logo=node.js&logoColor=white&color=339933" alt="Node.js version"></a>
 </p>
 
@@ -76,7 +76,7 @@ Requires Node 18+. That is the only dependency.
 From source:
 
 ```bash
-git clone https://github.com/199-biotechnologies/nanaban.git
+git clone https://github.com/paperfoot/nanaban-cli.git
 cd nanaban && npm install && npm link
 ```
 
@@ -293,7 +293,7 @@ Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 </p>
 
 <p align="center">
-  <a href="https://github.com/199-biotechnologies/nanaban/stargazers"><img src="https://img.shields.io/github/stars/199-biotechnologies/nanaban?style=for-the-badge&logo=github&label=%E2%AD%90%20Star%20this%20repo&color=yellow" alt="Star this repo"></a>
+  <a href="https://github.com/paperfoot/nanaban-cli/stargazers"><img src="https://img.shields.io/github/stars/paperfoot/nanaban-cli?style=for-the-badge&logo=github&label=%E2%AD%90%20Star%20this%20repo&color=yellow" alt="Star this repo"></a>
   &nbsp;
   <a href="https://x.com/longevityboris"><img src="https://img.shields.io/badge/Follow_%40longevityboris-000000?style=for-the-badge&logo=x&logoColor=white" alt="Follow @longevityboris on X"></a>
 </p>
