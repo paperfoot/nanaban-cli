@@ -1,9 +1,9 @@
-import { detectAuth, resolveRoute, makeGeminiClient, type AuthState } from './auth.js';
-import { resolveModel, type ModelInfo, type TransportId } from './models.js';
+import { detectAuth, resolveRoute, makeGeminiClient, transportAvailable, type AuthState, type ResolvedRoute } from './auth.js';
+import { resolveModel, type ModelInfo, type TransportId, TRANSPORT_PREFERENCE } from './models.js';
 import { generateViaGemini } from './transport-gemini.js';
 import { generateViaOpenRouter } from './transport-openrouter.js';
 import { parseAspectRatio, parseImageSize, checkCapabilities } from './aspect.js';
-import { NB2Error } from '../lib/errors.js';
+import { NB2Error, normalizeError, isTransient } from '../lib/errors.js';
 import type { ImageRequest, ImageResult, GenerationMode } from './types.js';
 import type { ReferenceImage } from './reference.js';
 
@@ -23,6 +23,7 @@ export interface DispatchOptions {
 export interface DispatchResult extends ImageResult {
   model: ModelInfo;
   authMethod: string;
+  fallbacks?: { transport: TransportId; code: string; message: string }[];
 }
 
 function pickModel(opts: DispatchOptions): ModelInfo {
@@ -40,6 +41,66 @@ function parseTransport(via: string | undefined): TransportId | undefined {
   if (via === 'gemini' || via === 'google') return 'gemini-direct';
   if (via === 'or') return 'openrouter';
   throw new NB2Error('CAPABILITY_UNSUPPORTED', `Unknown transport "${via}". Use one of: gemini-direct, openrouter`);
+}
+
+function buildRoute(model: ModelInfo, auth: AuthState, t: TransportId): ResolvedRoute | null {
+  const modelId = model.ids[t];
+  if (!modelId) return null;
+  if (!transportAvailable(t, auth)) return null;
+  if (t === 'gemini-direct') {
+    const g = auth.gemini!;
+    if (g.type === 'oauth') return { transport: t, modelId, oauthClient: g.client };
+    return { transport: t, modelId, authKey: g.key };
+  }
+  return { transport: t, modelId, authKey: auth.openRouter!.key };
+}
+
+function routesForModel(model: ModelInfo, auth: AuthState): ResolvedRoute[] {
+  const routes: ResolvedRoute[] = [];
+  for (const t of TRANSPORT_PREFERENCE) {
+    const r = buildRoute(model, auth, t);
+    if (r) routes.push(r);
+  }
+  return routes;
+}
+
+function noRoutesError(model: ModelInfo, auth: AuthState): NB2Error {
+  const keysConfigured: string[] = [];
+  if (auth.gemini) keysConfigured.push('Gemini');
+  if (auth.openRouter) keysConfigured.push('OpenRouter');
+
+  const needs = Object.keys(model.ids).map(t =>
+    t === 'gemini-direct' ? 'GEMINI_API_KEY' : 'OPENROUTER_API_KEY',
+  );
+
+  if (keysConfigured.length === 0) {
+    return new NB2Error(
+      'AUTH_MISSING',
+      `No authentication configured. ${model.display} needs one of ${needs.join(' or ')}. ` +
+        `Quick fix: run \`nanaban auth set-openrouter <key>\` (one key reaches every model), ` +
+        `or set OPENROUTER_API_KEY / GEMINI_API_KEY in the environment.`,
+    );
+  }
+
+  // Key exists but not for this model (e.g. only Gemini key for GPT-5).
+  return new NB2Error(
+    'TRANSPORT_UNAVAILABLE',
+    `${model.display} cannot be reached with currently-configured auth (${keysConfigured.join(', ')}). ` +
+      `This model needs ${needs.join(' or ')}. Run \`nanaban auth set-openrouter <key>\` to enable it.`,
+  );
+}
+
+async function runRoute(
+  route: ResolvedRoute,
+  auth: AuthState,
+  request: ImageRequest,
+  basePath?: string,
+): Promise<ImageResult> {
+  if (route.transport === 'gemini-direct') {
+    const client = makeGeminiClient(auth);
+    return generateViaGemini(client, route.modelId, request, basePath);
+  }
+  return generateViaOpenRouter(route.authKey!, route.modelId, request, basePath);
 }
 
 export async function dispatch(opts: DispatchOptions): Promise<DispatchResult> {
@@ -60,7 +121,6 @@ export async function dispatch(opts: DispatchOptions): Promise<DispatchResult> {
 
   const auth = await detectAuth();
   const forced = parseTransport(opts.via);
-  const route = resolveRoute(model, auth, forced);
 
   const request: ImageRequest = {
     mode: opts.mode,
@@ -71,19 +131,46 @@ export async function dispatch(opts: DispatchOptions): Promise<DispatchResult> {
     referenceImages: opts.referenceImages,
   };
 
-  let result: ImageResult;
-  if (route.transport === 'gemini-direct') {
-    const client = makeGeminiClient(auth);
-    result = await generateViaGemini(client, route.modelId, request, opts.basePath);
-  } else {
-    result = await generateViaOpenRouter(route.authKey!, route.modelId, request, opts.basePath);
+  // Explicit --via: one shot, no fallback. Caller asked for this specific route.
+  if (forced) {
+    const route = resolveRoute(model, auth, forced);
+    const result = await runRoute(route, auth, request, opts.basePath);
+    return { ...result, model, authMethod: describeAuth(route.transport, auth) };
   }
 
-  return {
-    ...result,
-    model,
-    authMethod: describeAuth(route.transport, auth),
-  };
+  // Auto routing: try preferred transport, fall back on transient failures.
+  const routes = routesForModel(model, auth);
+  if (routes.length === 0) throw noRoutesError(model, auth);
+
+  const fallbacks: { transport: TransportId; code: string; message: string }[] = [];
+  let lastErr: NB2Error | undefined;
+
+  for (let i = 0; i < routes.length; i++) {
+    const route = routes[i];
+    try {
+      const result = await runRoute(route, auth, request, opts.basePath);
+      return { ...result, model, authMethod: describeAuth(route.transport, auth), fallbacks: fallbacks.length ? fallbacks : undefined };
+    } catch (err) {
+      const nerr = normalizeError(err);
+      const isLast = i === routes.length - 1;
+      if (isLast || !isTransient(nerr)) {
+        // No more routes to try, or error isn't worth retrying on another provider.
+        if (fallbacks.length > 0) {
+          const chain = fallbacks.map(f => `${f.transport}:${f.code}`).join(' → ');
+          throw new NB2Error(
+            nerr.code,
+            `${nerr.message} (tried ${chain} → ${route.transport}:${nerr.code})`,
+          );
+        }
+        throw nerr;
+      }
+      fallbacks.push({ transport: route.transport, code: nerr.code, message: nerr.message });
+      lastErr = nerr;
+    }
+  }
+
+  // Unreachable — loop above always returns or throws.
+  throw lastErr ?? new NB2Error('GENERATION_FAILED', 'No route succeeded');
 }
 
 function describeAuth(transport: TransportId, auth: AuthState): string {

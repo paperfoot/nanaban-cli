@@ -3,6 +3,12 @@ import { createSpinner } from 'nanospinner';
 import type { Spinner } from 'nanospinner';
 import type { NB2Error } from './errors.js';
 
+export interface FallbackHop {
+  transport: string;
+  code: string;
+  message: string;
+}
+
 export interface GenerateResult {
   file: string;
   model: string;
@@ -12,6 +18,7 @@ export interface GenerateResult {
   sizeBytes: number;
   durationMs: number;
   costUsd?: number;
+  fallbacks?: FallbackHop[];
 }
 
 export interface Output {
@@ -50,6 +57,11 @@ export class HumanOutput implements Output {
       const cost = r.costUsd !== undefined ? ` | $${r.costUsd.toFixed(4)}` : '';
       const meta = pc.dim(`     ${r.width}x${r.height} | ${kb} KB | ${sec}s${cost} | ${r.model} (${r.transport})`);
       process.stderr.write(meta + '\n');
+      if (r.fallbacks?.length) {
+        for (const f of r.fallbacks) {
+          process.stderr.write(pc.yellow(`     fell back: ${f.transport} failed with ${f.code}, retried on ${r.transport}`) + '\n');
+        }
+      }
     }
     process.stdout.write(r.file + '\n');
   }
@@ -62,6 +74,8 @@ export class HumanOutput implements Output {
       process.stderr.write(pc.red(`Error: ${err.message}`) + '\n');
     }
     process.stderr.write(pc.dim(`     code: ${err.code}`) + '\n');
+    const hint = hintFor(err.code);
+    if (hint) process.stderr.write(pc.dim(`     hint: ${hint}`) + '\n');
   }
 
   info(text: string): void {
@@ -89,11 +103,15 @@ export class JsonOutput implements Output {
       duration_ms: r.durationMs,
     };
     if (r.costUsd !== undefined) out.cost_usd = r.costUsd;
+    if (r.fallbacks?.length) out.fallbacks = r.fallbacks;
     process.stdout.write(JSON.stringify(out) + '\n');
   }
 
   error(err: NB2Error): void {
-    process.stdout.write(JSON.stringify({ status: 'error', code: err.code, message: err.message }) + '\n');
+    const payload: Record<string, unknown> = { status: 'error', code: err.code, message: err.message };
+    const hint = hintFor(err.code);
+    if (hint) payload.hint = hint;
+    process.stdout.write(JSON.stringify(payload) + '\n');
   }
 
   info(_text: string): void {}
@@ -105,4 +123,27 @@ export class JsonOutput implements Output {
 
 export function createOutput(json: boolean, quiet: boolean): Output {
   return json ? new JsonOutput() : new HumanOutput(quiet);
+}
+
+function hintFor(code: string): string | null {
+  switch (code) {
+    case 'AUTH_MISSING':
+      return 'run `nanaban auth set-openrouter <key>` — one OpenRouter key reaches every model (Nano Banana + GPT-5 Image).';
+    case 'AUTH_INVALID':
+      return 'key was rejected. Get a fresh one: OpenRouter → https://openrouter.ai/keys, Gemini → https://aistudio.google.com/apikey';
+    case 'AUTH_EXPIRED':
+      return 'OAuth token expired. Re-auth with `gemini auth`, or set OPENROUTER_API_KEY to bypass OAuth entirely.';
+    case 'RATE_LIMITED':
+      return 'add a second provider so nanaban can fall back automatically: `nanaban auth set-openrouter <key>` or set OPENROUTER_API_KEY.';
+    case 'NETWORK_ERROR':
+      return 'transient network or upstream failure. Retry, or add a second provider for automatic failover.';
+    case 'TRANSPORT_UNAVAILABLE':
+      return 'the requested model cannot be reached with the auth you have. Run `nanaban auth` to see what IS reachable.';
+    case 'CAPABILITY_UNSUPPORTED':
+      return 'run `nanaban agent-info` to see each model\'s supported aspect ratios, sizes, and features.';
+    case 'MODEL_NOT_FOUND':
+      return 'run `nanaban agent-info` for the list of valid model ids and aliases.';
+    default:
+      return null;
+  }
 }

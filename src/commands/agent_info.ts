@@ -49,9 +49,18 @@ export function runAgentInfo(): void {
       cost_per_image_usd: m.costPerImageUsd,
     })),
     auth_resolution: {
-      policy: 'For each request, pick the first available transport in preference order (gemini-direct, openrouter), unless --via overrides. Any single key is enough — you do not need both.',
-      preference_order: ['gemini-direct', 'openrouter'],
+      policy: 'Pick the first available transport in preference order (openrouter, gemini-direct). On a transient failure (RATE_LIMITED, NETWORK_ERROR, AUTH_INVALID, AUTH_EXPIRED) automatically retry on the next available transport. --via <transport> pins a single route and disables fallback. Any single key is enough — you do not need both.',
+      preference_order: ['openrouter', 'gemini-direct'],
+      preference_rationale: 'OpenRouter reaches every model (Gemini + OpenAI) with one key, has its own rate bucket, and bills per-use — it is the most reliable default. gemini-direct is tried second for users with a free-tier Gemini key who have not set up OpenRouter.',
       override_flag: '--via <transport>',
+      fallback_behavior: {
+        enabled: true,
+        disabled_when: '--via <transport> is set',
+        retry_on_codes: ['RATE_LIMITED', 'NETWORK_ERROR', 'AUTH_INVALID', 'AUTH_EXPIRED'],
+        skip_on_codes: ['GENERATION_FAILED', 'CAPABILITY_UNSUPPORTED', 'MODEL_NOT_FOUND'],
+        surfaces_as: 'success envelope gains a `fallbacks` array listing each failed transport hop (transport, code, message); error envelope message includes the full chain (e.g. "RATE_LIMITED (tried openrouter:RATE_LIMITED → gemini-direct:RATE_LIMITED)")',
+      },
+      recommendation: 'Set OPENROUTER_API_KEY for best reliability; optionally also set GEMINI_API_KEY so nanaban can fall back automatically when one provider is rate-limited or down.',
     },
     commands: [
       {
@@ -143,8 +152,10 @@ export function runAgentInfo(): void {
       stdout: 'File path only (pipeable). With --json: full JSON envelope.',
       stderr: 'Metadata, spinner, errors (human mode only)',
       json_envelope: {
-        success: '{"status":"success","file":"...","model":"...","transport":"...","dimensions":{"width":N,"height":N},"size_bytes":N,"duration_ms":N,"cost_usd":N}',
-        error: '{"status":"error","code":"ERROR_CODE","message":"..."}',
+        success: '{"status":"success","file":"...","model":"...","transport":"...","dimensions":{"width":N,"height":N},"size_bytes":N,"duration_ms":N,"cost_usd":N,"fallbacks":[{"transport":"...","code":"...","message":"..."}]}',
+        success_notes: '`fallbacks` is only present when the preferred transport failed and auto-fallback kicked in; `transport` reflects the transport that actually succeeded.',
+        error: '{"status":"error","code":"ERROR_CODE","message":"...","hint":"actionable recovery suggestion"}',
+        error_notes: '`hint` is a human-readable recovery suggestion included on every error. Agents should read it — it names the exact command to run or env var to set.',
       },
     },
     install: 'npm install -g nanaban',

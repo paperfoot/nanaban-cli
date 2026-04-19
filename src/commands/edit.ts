@@ -70,6 +70,7 @@ export async function runEdit(imagePath: string, prompt: string, opts: EditComma
       sizeBytes: result.buffer.length,
       durationMs: result.durationMs,
       costUsd: result.costUsd,
+      fallbacks: result.fallbacks,
     });
 
     if (opts.open) {

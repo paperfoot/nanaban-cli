@@ -112,4 +112,4 @@ export function listModelNames(): string[] {
   return MODELS.map(m => m.id);
 }
 
-export const TRANSPORT_PREFERENCE: TransportId[] = ['gemini-direct', 'openrouter'];
+export const TRANSPORT_PREFERENCE: TransportId[] = ['openrouter', 'gemini-direct'];

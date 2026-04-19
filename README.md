@@ -122,13 +122,19 @@ nanaban detects keys in this order and routes automatically. **Any single key is
 
 | Key | Reaches | Source |
 |-----|---------|--------|
+| `OPENROUTER_API_KEY` | **All four models** | env var |
+| Stored OpenRouter key | All four models | `nanaban auth set-openrouter <key>` |
 | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | nb2, nb2-pro | env var |
 | Stored Gemini key | nb2, nb2-pro | `nanaban auth set <key>` |
 | Gemini OAuth | nb2, nb2-pro | `~/.gemini/oauth_creds.json` + OAuth client creds |
-| `OPENROUTER_API_KEY` | nb2, nb2-pro, **gpt5, gpt5-mini** | env var |
-| Stored OpenRouter key | All four | `nanaban auth set-openrouter <key>` |
 
-When both Gemini direct and OpenRouter are configured, nanaban prefers the direct path (lower latency, no middleman markup). Override with `--via openrouter`.
+### Routing policy
+
+1. **OpenRouter is the default.** One key reaches every model, runs on its own rate bucket, and the usage is billed per-call — no free-tier surprises.
+2. **Automatic fallback.** If the preferred transport returns a transient failure (`RATE_LIMITED`, `NETWORK_ERROR`, `AUTH_INVALID`, `AUTH_EXPIRED`) nanaban retries on the next available transport. The success envelope gains a `fallbacks` array so the caller sees what happened.
+3. **`--via <transport>` pins a route.** No fallback when explicit.
+
+**Recommended for agents**: set both keys. `OPENROUTER_API_KEY` is the primary, `GEMINI_API_KEY` is the failover. Most "my agent is stupid, it didn't retry" moments come from only having one key configured.
 
 Check what's reachable: `nanaban auth`.
 
@@ -231,13 +237,27 @@ nanaban "a red circle" --json
 
 `cost_usd` appears when the transport reports it (currently OpenRouter only).
 
-Errors come back in the same shape:
+Errors come back in the same shape, with a `hint` the agent can act on:
 
 ```json
 {
   "status": "error",
-  "code": "CAPABILITY_UNSUPPORTED",
-  "message": "Nano Banana Pro does not support aspect ratio 1:8. Supported: 1:1, 2:3, 3:2, ..."
+  "code": "RATE_LIMITED",
+  "message": "Gemini quota exceeded (tried openrouter:RATE_LIMITED → gemini-direct:RATE_LIMITED)",
+  "hint": "add a second provider so nanaban can fall back automatically: `nanaban auth set-openrouter <key>` or set OPENROUTER_API_KEY."
+}
+```
+
+When auto-fallback kicks in and eventually succeeds, the success envelope carries a `fallbacks` audit trail:
+
+```json
+{
+  "status": "success",
+  "file": "/Users/you/fox_snow.png",
+  "transport": "gemini-direct",
+  "fallbacks": [
+    { "transport": "openrouter", "code": "RATE_LIMITED", "message": "..." }
+  ]
 }
 ```
 

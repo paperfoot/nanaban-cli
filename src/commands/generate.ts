@@ -62,6 +62,7 @@ export async function runGenerate(prompt: string, opts: GenerateCommandOpts): Pr
       sizeBytes: result.buffer.length,
       durationMs: result.durationMs,
       costUsd: result.costUsd,
+      fallbacks: result.fallbacks,
     });
 
     if (opts.open) {

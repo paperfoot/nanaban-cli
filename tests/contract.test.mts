@@ -79,6 +79,32 @@ describe('agent-info', () => {
     assert.deepEqual(ids.sort(), ['gemini-direct', 'openrouter']);
   });
 
+  it('prefers openrouter over gemini-direct', () => {
+    const { stdout } = run(['agent-info']);
+    const manifest = JSON.parse(stdout);
+    assert.deepEqual(
+      manifest.auth_resolution.preference_order,
+      ['openrouter', 'gemini-direct'],
+      'OpenRouter must be the default — it reaches every model and has a separate rate bucket',
+    );
+  });
+
+  it('declares automatic fallback on transient errors', () => {
+    const { stdout } = run(['agent-info']);
+    const manifest = JSON.parse(stdout);
+    const fb = manifest.auth_resolution.fallback_behavior;
+    assert.equal(fb.enabled, true, 'fallback must be enabled');
+    assert.ok(fb.retry_on_codes.includes('RATE_LIMITED'), 'must retry on RATE_LIMITED');
+    assert.ok(fb.retry_on_codes.includes('NETWORK_ERROR'), 'must retry on NETWORK_ERROR');
+    assert.match(fb.disabled_when, /--via/, 'must document that --via disables fallback');
+  });
+
+  it('error envelope documents hint field', () => {
+    const { stdout } = run(['agent-info']);
+    const manifest = JSON.parse(stdout);
+    assert.match(manifest.output_contract.json_envelope.error, /hint/, 'error envelope must include hint');
+  });
+
   it('lists exit codes 0, 1, 2', () => {
     const { stdout } = run(['agent-info']);
     const manifest = JSON.parse(stdout);

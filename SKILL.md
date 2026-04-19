@@ -14,12 +14,18 @@ nanaban edit photo.png "add sunglasses"
 
 ## Auth
 
-Auth is automatic (in priority order):
-1. `GEMINI_API_KEY` / `GOOGLE_API_KEY` env var
-2. `~/.nanaban/config.json` — stored via `nanaban auth set <key>`
-3. Gemini CLI OAuth (`~/.gemini/oauth_creds.json` + OAuth client credentials in env or config)
+Auth is automatic. Preferred order:
+1. `OPENROUTER_API_KEY` env var — **recommended default**. One key reaches every model; separate rate bucket; no free-tier quota surprises.
+2. Stored OpenRouter key via `nanaban auth set-openrouter <key>`
+3. `GEMINI_API_KEY` / `GOOGLE_API_KEY` env var — used if OpenRouter is absent, or as auto-fallback.
+4. Stored Gemini key via `nanaban auth set <key>`
+5. Gemini CLI OAuth (`~/.gemini/oauth_creds.json` + OAuth client creds)
 
-Check status: `nanaban auth`
+**Automatic fallback**: if the preferred transport fails with `RATE_LIMITED`, `NETWORK_ERROR`, `AUTH_INVALID`, or `AUTH_EXPIRED`, nanaban retries on the next available transport. No extra flag needed. `--via <transport>` pins a route and disables fallback.
+
+**Tip for agents**: set BOTH `OPENROUTER_API_KEY` and `GEMINI_API_KEY`. When one hits a rate limit, the other takes over silently. The success JSON gains a `fallbacks` array when that happens.
+
+Check status: `nanaban auth`. Machine-readable: `nanaban agent-info`.
 
 ## Defaults
 
