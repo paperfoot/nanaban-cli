@@ -3,4 +3,4 @@
 // Imported as a plain const so `bun build --compile` embeds it directly —
 // reading package.json at runtime fails in compiled binaries because the
 // embedded virtual FS (/$bunfs/...) does not include the project manifest.
-export const VERSION = '4.2.0';
+export const VERSION = '4.2.1';

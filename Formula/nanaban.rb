@@ -18,25 +18,25 @@
 class Nanaban < Formula
   desc "Image generation from the terminal (GPT Image 2, Nano Banana, GPT-5 Image)"
   homepage "https://github.com/paperfoot/nanaban-cli"
-  version "4.2.0"
+  version "4.2.1"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/paperfoot/nanaban-cli/releases/download/v4.2.0/nanaban-darwin-arm64"
+      url "https://github.com/paperfoot/nanaban-cli/releases/download/v4.2.1/nanaban-darwin-arm64"
       sha256 "REPLACE_WITH_SHA256_FROM_RELEASE"
     else
-      url "https://github.com/paperfoot/nanaban-cli/releases/download/v4.2.0/nanaban-darwin-x64"
+      url "https://github.com/paperfoot/nanaban-cli/releases/download/v4.2.1/nanaban-darwin-x64"
       sha256 "REPLACE_WITH_SHA256_FROM_RELEASE"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/paperfoot/nanaban-cli/releases/download/v4.2.0/nanaban-linux-arm64"
+      url "https://github.com/paperfoot/nanaban-cli/releases/download/v4.2.1/nanaban-linux-arm64"
       sha256 "REPLACE_WITH_SHA256_FROM_RELEASE"
     else
-      url "https://github.com/paperfoot/nanaban-cli/releases/download/v4.2.0/nanaban-linux-x64"
+      url "https://github.com/paperfoot/nanaban-cli/releases/download/v4.2.1/nanaban-linux-x64"
       sha256 "REPLACE_WITH_SHA256_FROM_RELEASE"
     end
   end
