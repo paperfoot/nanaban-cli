@@ -12,10 +12,15 @@ let originalFetch: FetchFn;
 beforeEach(() => { originalFetch = globalThis.fetch; });
 afterEach(() => { globalThis.fetch = originalFetch; });
 
-function sseStream(events: string[]): ReadableStream<Uint8Array> {
+function sseStream(events: string[], opts: { dropTrailingTerminator?: boolean } = {}): ReadableStream<Uint8Array> {
   // SSE events end with `\n\n` and `data:` lines carry the JSON payload.
   const encoder = new TextEncoder();
-  const body = events.map(e => `data: ${e}\n\n`).join('');
+  let body = events.map(e => `data: ${e}\n\n`).join('');
+  // Codex has been observed closing the stream without the trailing blank line —
+  // exercise that path so the parser's EOF flush has coverage.
+  if (opts.dropTrailingTerminator && body.endsWith('\n\n')) {
+    body = body.slice(0, -2);
+  }
   return new ReadableStream({
     start(controller) {
       // Split into two chunks to exercise buffering across reads.
@@ -213,7 +218,7 @@ describe('transport-codex-oauth', () => {
     );
   });
 
-  it('surfaces response.failed events', async () => {
+  it('surfaces response.failed (content policy) as GENERATION_FAILED', async () => {
     const events = [JSON.stringify({
       type: 'response.failed',
       response: { error: { message: 'content policy block' } },
@@ -228,5 +233,71 @@ describe('transport-codex-oauth', () => {
       ),
       (err: any) => err.code === 'GENERATION_FAILED' && /content policy/.test(err.message),
     );
+  });
+
+  it('classifies streamed response.failed with status:429 as RATE_LIMITED', async () => {
+    const events = [JSON.stringify({
+      type: 'response.failed',
+      response: { status: 429, error: { message: 'ChatGPT image quota exceeded' } },
+    })];
+    globalThis.fetch = (async () => new Response(sseStream(events), { status: 200 })) as FetchFn;
+
+    await assert.rejects(
+      () => generateViaCodexOAuth(
+        { accessToken: 't', accountId: 'a' },
+        'gpt-image-2',
+        { mode: 'generate', prompt: 'x' },
+      ),
+      (err: any) => err.code === 'RATE_LIMITED' && /quota/.test(err.message),
+    );
+  });
+
+  it('classifies streamed response.failed with status:401 as AUTH_INVALID', async () => {
+    const events = [JSON.stringify({
+      type: 'response.failed',
+      response: { status: 401, error: { message: 'token expired' } },
+    })];
+    globalThis.fetch = (async () => new Response(sseStream(events), { status: 200 })) as FetchFn;
+
+    await assert.rejects(
+      () => generateViaCodexOAuth(
+        { accessToken: 't', accountId: 'a' },
+        'gpt-image-2',
+        { mode: 'generate', prompt: 'x' },
+      ),
+      (err: any) => err.code === 'AUTH_INVALID' && /codex login/.test(err.message),
+    );
+  });
+
+  it('classifies streamed response.failed with status:500 as NETWORK_ERROR (retryable)', async () => {
+    const events = [JSON.stringify({
+      type: 'response.failed',
+      response: { status: 503, error: { message: 'backend unavailable' } },
+    })];
+    globalThis.fetch = (async () => new Response(sseStream(events), { status: 200 })) as FetchFn;
+
+    await assert.rejects(
+      () => generateViaCodexOAuth(
+        { accessToken: 't', accountId: 'a' },
+        'gpt-image-2',
+        { mode: 'generate', prompt: 'x' },
+      ),
+      (err: any) => err.code === 'NETWORK_ERROR',
+    );
+  });
+
+  it('flushes the final event at EOF when the stream closes without a trailing blank line', async () => {
+    const events = [JSON.stringify({
+      type: 'response.output_item.done',
+      item: { type: 'image_generation_call', result: TINY_PNG_B64 },
+    })];
+    globalThis.fetch = (async () => new Response(sseStream(events, { dropTrailingTerminator: true }), { status: 200 })) as FetchFn;
+
+    const res = await generateViaCodexOAuth(
+      { accessToken: 't', accountId: 'a' },
+      'gpt-image-2',
+      { mode: 'generate', prompt: 'x' },
+    );
+    assert.equal(res.buffer.toString('base64'), TINY_PNG_B64);
   });
 });

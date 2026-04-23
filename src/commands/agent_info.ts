@@ -32,7 +32,7 @@ export function runAgentInfo(): void {
       },
       {
         id: 'openrouter',
-        description: 'OpenRouter chat completions endpoint (reaches Gemini and OpenAI image models)',
+        description: 'OpenRouter chat completions endpoint (reaches Nano Banana + GPT-5 Image; does NOT reach gpt-image-2 — that needs codex-oauth)',
         env_keys: ['OPENROUTER_API_KEY'],
         config_key: 'openRouterKey',
         endpoint: 'https://openrouter.ai/api/v1/chat/completions',

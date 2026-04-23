@@ -30,9 +30,18 @@ export interface DispatchResult extends ImageResult {
 function pickModel(opts: DispatchOptions, auth: AuthState): ModelInfo {
   let name = opts.modelName;
   if (!name) {
+    // Only auto-select gpt-image-2 when the user hasn't pinned a non-Codex transport.
+    // `--via openrouter` on a machine with Codex auth should still route nb2 through
+    // OpenRouter, not fail because the auto-picked default model has no openrouter id.
+    const viaForcesNonCodex =
+      opts.via !== undefined &&
+      opts.via !== 'codex-oauth' &&
+      opts.via !== 'codex' &&
+      opts.via !== 'plus';
+
     if (opts.pro) {
       name = 'nb2-pro';
-    } else if (auth.codex) {
+    } else if (auth.codex && !viaForcesNonCodex) {
       name = 'gpt-image-2';
     } else {
       name = 'nb2';
@@ -96,9 +105,12 @@ function noRoutesError(model: ModelInfo, auth: AuthState): NB2Error {
   const needs = Object.keys(model.ids).map(t => needsForTransport(t as TransportId));
 
   if (keysConfigured.length === 0) {
-    const hint = model.ids['codex-oauth']
-      ? 'Quick fix: run `codex login` (free via ChatGPT Plus/Pro), or set OPENROUTER_API_KEY.'
-      : 'Quick fix: run `nanaban auth set-openrouter <key>` (one key reaches every OR-routed model), or set OPENROUTER_API_KEY / GEMINI_API_KEY.';
+    const onlyCodex = Object.keys(model.ids).length === 1 && !!model.ids['codex-oauth'];
+    const hint = onlyCodex
+      ? 'Quick fix: run `codex login` (free via ChatGPT Plus/Pro). This model is only reachable via the Codex bridge.'
+      : model.ids['codex-oauth']
+        ? 'Quick fix: run `codex login` (free via ChatGPT Plus/Pro), or set OPENROUTER_API_KEY.'
+        : 'Quick fix: run `nanaban auth set-openrouter <key>` (one key reaches every OR-routed model), or set OPENROUTER_API_KEY / GEMINI_API_KEY.';
     return new NB2Error(
       'AUTH_MISSING',
       `No authentication configured. ${model.display} needs one of ${needs.join(' or ')}. ${hint}`,

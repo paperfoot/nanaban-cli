@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { loadReferenceImage } from './reference.js';
 import { NB2Error } from '../lib/errors.js';
+import type { ErrorCode } from '../lib/errors.js';
 import type { ImageRequest, ImageResult, AspectRatio } from './types.js';
 
 const ENDPOINT = 'https://chatgpt.com/backend-api/codex/responses';
@@ -10,6 +11,11 @@ const ENDPOINT = 'https://chatgpt.com/backend-api/codex/responses';
 // runs the current GPT Image model. `gpt-5.4` is the safe everyday default today;
 // override via NANABAN_CODEX_CARRIER if OpenAI rotates the list.
 const CARRIER_MODEL = process.env.NANABAN_CODEX_CARRIER ?? 'gpt-5.4';
+
+// Cap on the in-flight SSE buffer so a chattery/hostile stream can't grow memory
+// without bound. 32 MiB is ~ an order of magnitude above a maximal 1536x1024 PNG
+// base64-encoded, which is the largest payload we ever expect in a single event.
+const MAX_SSE_BUFFER = 32 * 1024 * 1024;
 
 // gpt-image-2 via the Codex bridge accepts these three discrete output sizes.
 // Any aspect ratio outside this set is rejected up front by aspect.ts
@@ -34,6 +40,68 @@ function resolveSize(ratio: AspectRatio): string {
 export interface CodexOAuthAuth {
   accessToken: string;
   accountId: string;
+}
+
+// Streamed `response.failed` / `error` events carry their own status / message.
+// Classify them the same way as non-OK HTTP responses so the dispatch fallback
+// chain treats them as transient (retryable on another transport) when warranted.
+function classifyStreamFailure(parsed: any): NB2Error {
+  const msg: string =
+    parsed.response?.error?.message
+    ?? parsed.error?.message
+    ?? `Codex bridge reported ${parsed.type}`;
+  const status: number | undefined =
+    parsed.response?.status
+    ?? parsed.response?.error?.status
+    ?? parsed.error?.status
+    ?? parsed.status;
+  const code: string | undefined =
+    parsed.response?.error?.code
+    ?? parsed.error?.code;
+
+  const authHint = / — run \`codex login\`/.test(msg) ? '' : ' — run `codex login`';
+
+  if (status === 401 || code === 'unauthorized' || code === 'invalid_token') {
+    return new NB2Error('AUTH_INVALID', `Codex OAuth token rejected${authHint}. ${msg}`);
+  }
+  if (status === 403 || code === 'forbidden') {
+    return new NB2Error('AUTH_INVALID', `Codex bridge forbade this account: ${msg}`);
+  }
+  if (status === 429 || code === 'rate_limit_exceeded' || /rate.?limit|quota|exceeded/i.test(msg)) {
+    return new NB2Error('RATE_LIMITED', `Codex bridge rate-limited: ${msg}`);
+  }
+  if (typeof status === 'number' && status >= 500) {
+    return new NB2Error('NETWORK_ERROR', `Codex backend ${status}: ${msg}`);
+  }
+  return new NB2Error('GENERATION_FAILED', msg);
+}
+
+// Parse one SSE event (lines already split, \n-separated) and return the
+// decoded JSON payload from its `data:` lines, or null if the event carries none.
+function dataFromEvent(rawEvent: string): string | null {
+  let data = '';
+  for (const line of rawEvent.split('\n')) {
+    if (line.startsWith('data:')) data += line.slice(5).trimStart();
+  }
+  if (!data || data === '[DONE]') return null;
+  return data;
+}
+
+type EventResult =
+  | { kind: 'image'; base64: string }
+  | { kind: 'failure'; err: NB2Error }
+  | { kind: 'ignore' };
+
+function classifyEvent(parsed: any): EventResult {
+  if (parsed.type === 'response.output_item.done'
+      && parsed.item?.type === 'image_generation_call'
+      && typeof parsed.item?.result === 'string') {
+    return { kind: 'image', base64: parsed.item.result };
+  }
+  if (parsed.type === 'response.failed' || parsed.type === 'error') {
+    return { kind: 'failure', err: classifyStreamFailure(parsed) };
+  }
+  return { kind: 'ignore' };
 }
 
 /**
@@ -106,19 +174,17 @@ export async function generateViaCodexOAuth(
     const text = await res.text().catch(() => '');
     let detail = text;
     try { detail = JSON.parse(text)?.error?.message || text; } catch { /* not json */ }
-    if (res.status === 401) {
-      throw new NB2Error('AUTH_INVALID', `Codex OAuth token rejected — run \`codex login\`. ${detail}`);
-    }
-    if (res.status === 403) {
-      throw new NB2Error('AUTH_INVALID', `Codex bridge forbade this account: ${detail}`);
-    }
-    if (res.status === 429) {
-      throw new NB2Error('RATE_LIMITED', `Codex bridge rate-limited (ChatGPT sub quota): ${detail}`);
-    }
-    if (res.status >= 500) {
-      throw new NB2Error('NETWORK_ERROR', `Codex backend ${res.status}: ${detail}`);
-    }
-    throw new NB2Error('GENERATION_FAILED', `Codex backend ${res.status}: ${detail}`);
+    const code: ErrorCode =
+      res.status === 401 || res.status === 403 ? 'AUTH_INVALID'
+      : res.status === 429 ? 'RATE_LIMITED'
+      : res.status >= 500 ? 'NETWORK_ERROR'
+      : 'GENERATION_FAILED';
+    const prefix =
+      code === 'AUTH_INVALID' ? 'Codex OAuth token rejected — run `codex login`. '
+      : code === 'RATE_LIMITED' ? 'Codex bridge rate-limited (ChatGPT sub quota): '
+      : code === 'NETWORK_ERROR' ? `Codex backend ${res.status}: `
+      : `Codex backend ${res.status}: `;
+    throw new NB2Error(code, `${prefix}${detail}`);
   }
 
   if (!res.body) throw new NB2Error('GENERATION_FAILED', 'Codex bridge returned empty body');
@@ -127,45 +193,63 @@ export async function generateViaCodexOAuth(
   const decoder = new TextDecoder();
   let buf = '';
   let base64: string | null = null;
-  let streamError: string | null = null;
+  let failure: NB2Error | null = null;
 
-  outer: while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-
-    // SSE events are separated by a blank line (\n\n). Handle CRLF too.
-    buf = buf.replace(/\r\n/g, '\n');
-    let sep: number;
-    while ((sep = buf.indexOf('\n\n')) !== -1) {
-      const rawEvent = buf.slice(0, sep);
-      buf = buf.slice(sep + 2);
-      // Collect `data:` lines in this event.
-      let dataStr = '';
-      for (const line of rawEvent.split('\n')) {
-        if (line.startsWith('data:')) dataStr += line.slice(5).trimStart();
+  try {
+    outer: while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      if (buf.length > MAX_SSE_BUFFER) {
+        throw new NB2Error(
+          'GENERATION_FAILED',
+          `Codex bridge sent >${MAX_SSE_BUFFER >> 20}MB without delivering an image — aborting.`,
+        );
       }
-      if (!dataStr || dataStr === '[DONE]') continue;
-      let parsed: any;
-      try { parsed = JSON.parse(dataStr); } catch { continue; }
 
-      if (parsed.type === 'response.output_item.done'
-          && parsed.item?.type === 'image_generation_call'
-          && typeof parsed.item?.result === 'string') {
-        base64 = parsed.item.result;
-        break outer;
-      }
-      if (parsed.type === 'response.failed' || parsed.type === 'error') {
-        streamError =
-          parsed.response?.error?.message
-          ?? parsed.error?.message
-          ?? `Codex bridge reported ${parsed.type}`;
-        break outer;
+      // SSE events are separated by a blank line (\n\n). Handle CRLF too.
+      buf = buf.replace(/\r\n/g, '\n');
+      let sep: number;
+      while ((sep = buf.indexOf('\n\n')) !== -1) {
+        const rawEvent = buf.slice(0, sep);
+        buf = buf.slice(sep + 2);
+        const dataStr = dataFromEvent(rawEvent);
+        if (!dataStr) continue;
+        let parsed: any;
+        try { parsed = JSON.parse(dataStr); } catch { continue; }
+
+        const ev = classifyEvent(parsed);
+        if (ev.kind === 'image') { base64 = ev.base64; break outer; }
+        if (ev.kind === 'failure') { failure = ev.err; break outer; }
       }
     }
+
+    // Flush the decoder and any trailing event not terminated by \n\n. The Codex
+    // bridge has been observed to close the stream without the trailing blank
+    // line, which would otherwise strand the final image in buf.
+    if (!base64 && !failure) {
+      buf += decoder.decode();
+      buf = buf.replace(/\r\n/g, '\n');
+      const tail = buf.trim();
+      if (tail.length > 0) {
+        const dataStr = dataFromEvent(tail);
+        if (dataStr) {
+          try {
+            const parsed = JSON.parse(dataStr);
+            const ev = classifyEvent(parsed);
+            if (ev.kind === 'image') base64 = ev.base64;
+            else if (ev.kind === 'failure') failure = ev.err;
+          } catch { /* unparseable trailer — fall through */ }
+        }
+      }
+    }
+  } finally {
+    // Release the connection promptly whether we exited with an image, a failure,
+    // or an exception. Swallow any cancel error — we've already got what we need.
+    await reader.cancel().catch(() => {});
   }
 
-  if (streamError) throw new NB2Error('GENERATION_FAILED', streamError);
+  if (failure) throw failure;
   if (!base64) {
     throw new NB2Error(
       'GENERATION_FAILED',
