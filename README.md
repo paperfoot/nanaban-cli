@@ -5,7 +5,7 @@
 <h1 align="center">nanaban</h1>
 
 <p align="center">
-  Image generation from the terminal. <strong>GPT Image 2</strong> free on ChatGPT Plus/Pro, Nano Banana (Gemini), and GPT-5 Image. One CLI.
+  Image generation from the terminal. <strong>GPT Image 2 free on your ChatGPT Plus/Pro subscription</strong> — no OpenAI API key, no metered billing. Plus Nano Banana (Gemini) and GPT-5 Image. One CLI.
 </p>
 
 <p align="center">
@@ -59,11 +59,11 @@ Most AI image generators make you open a browser, wait in a queue, click through
 nanaban fixes that:
 
 - **One command** — type your prompt, get a file. No browser, no signup flow, no queue.
-- **Free GPT Image 2** for ChatGPT Plus/Pro subscribers — nanaban signs in with your Codex OAuth token, so every generation counts against your ChatGPT image quota, not your OpenAI API balance. Zero marginal cost.
+- **Free GPT Image 2** for ChatGPT Plus/Pro subscribers. nanaban reads the OAuth token written by `codex login` and hits the private Codex backend (`chatgpt.com/backend-api/codex/responses`) on your behalf — every generation decrements your ChatGPT image quota, **not** your OpenAI API balance. Zero marginal cost, no API key needed.
 - **Three model families, one CLI** — GPT Image 2 (OpenAI's April 2026 flagship) when Codex auth is present, Nano Banana (Gemini) for the cheap/fast default with extended ratios, GPT-5 Image for OpenAI's text/UI work via OpenRouter.
 - **Auto-names files** — `"a fox in a snowy forest at dawn"` becomes `fox_snowy_forest_dawn.png`.
 - **Built for scripts** — stdout is always the file path. `nanaban "a cat" | xargs open` just works.
-- **Built for LLM agents** — `--json` gives structured output with cost. `nanaban agent-info` is a machine-readable manifest of every model, flag, transport, and error code.
+- **Built for LLM agents** — `--json` gives structured output with cost. `nanaban agent-info` is a machine-readable manifest of every model, flag, transport, and error code (with per-code recovery instructions).
 - **Tiny footprint** — one Node package, or one standalone binary with no runtime required.
 
 ## Install
@@ -74,7 +74,6 @@ Three options, pick whichever matches how you like to install CLIs:
 
 ```bash
 brew install paperfoot/tap/nanaban
-# (tap setup: `brew tap paperfoot/tap https://github.com/paperfoot/homebrew-tap`)
 ```
 
 **Standalone binary** (no Node needed, pick your platform):
