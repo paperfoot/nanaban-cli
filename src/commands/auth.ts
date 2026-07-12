@@ -55,7 +55,7 @@ interface CheckResult {
   credits_remaining_usd?: number;
 }
 
-// Live-probe each configured credential. `nanaban auth` without --check only
+// Live-probe each configured credential. `slika auth` without --check only
 // reports what is configured; keys can be present but revoked/expired, so
 // agents should run `auth --check` before assuming a transport works.
 async function liveCheck(state: AuthState): Promise<CheckResult[]> {
@@ -146,14 +146,14 @@ export async function runAuthStatus(json: boolean, check = false): Promise<void>
       ...(checks ? { checks } : {}),
       reachable_models: reachable.map(r => ({ id: r.model.id, transports: r.transports })),
     }) + '\n');
-    if (methods.length === 0) process.exit(1);
+    if (methods.length === 0) process.exit(2);
     return;
   }
 
   const out = createOutput(false, false);
   if (methods.length === 0) {
-    out.authStatus('none', 'No authentication configured. Options: run `codex login` (free via ChatGPT Plus/Pro → gpt-image-2), `nanaban auth set-openrouter <key>` (all models via OpenRouter), or set GEMINI_API_KEY / OPENROUTER_API_KEY.', false);
-    process.exit(1);
+    out.authStatus('none', 'No authentication configured. Options: run `codex login` (free via ChatGPT Plus/Pro → gpt-image-2), `slika auth set-openrouter <key>` (all models via OpenRouter), or set GEMINI_API_KEY / OPENROUTER_API_KEY.', false);
+    process.exit(2);
   }
 
   for (const m of methods) {
@@ -170,22 +170,22 @@ export async function runAuthStatus(json: boolean, check = false): Promise<void>
 
 export async function runAuthSet(key: string, json: boolean): Promise<void> {
   if (!key) {
-    if (json) process.stdout.write(JSON.stringify({ status: 'error', code: 'USAGE', message: 'No key provided. Usage: nanaban auth set <key>' }) + '\n');
-    else createOutput(false, false).authStatus('config', 'No key provided. Usage: nanaban auth set <key>', false);
-    process.exit(2);
+    if (json) process.stdout.write(JSON.stringify({ status: 'error', code: 'USAGE', message: 'No key provided. Usage: slika auth set <key>' }) + '\n');
+    else createOutput(false, false).authStatus('config', 'No key provided. Usage: slika auth set <key>', false);
+    process.exit(3);
   }
   await setStoredKey(key);
-  if (json) process.stdout.write(JSON.stringify({ status: 'ok', message: 'Gemini API key saved to ~/.nanaban/config.json' }) + '\n');
-  else createOutput(false, false).authStatus('config', 'Gemini API key saved to ~/.nanaban/config.json', true);
+  if (json) process.stdout.write(JSON.stringify({ status: 'ok', message: 'Gemini API key saved to ~/.slika/config.json' }) + '\n');
+  else createOutput(false, false).authStatus('config', 'Gemini API key saved to ~/.slika/config.json', true);
 }
 
 export async function runAuthSetOpenRouter(key: string, json: boolean): Promise<void> {
   if (!key) {
-    if (json) process.stdout.write(JSON.stringify({ status: 'error', code: 'USAGE', message: 'No key provided. Usage: nanaban auth set-openrouter <key>' }) + '\n');
-    else createOutput(false, false).authStatus('config', 'No key provided. Usage: nanaban auth set-openrouter <key>', false);
-    process.exit(2);
+    if (json) process.stdout.write(JSON.stringify({ status: 'error', code: 'USAGE', message: 'No key provided. Usage: slika auth set-openrouter <key>' }) + '\n');
+    else createOutput(false, false).authStatus('config', 'No key provided. Usage: slika auth set-openrouter <key>', false);
+    process.exit(3);
   }
   await setStoredOpenRouterKey(key);
-  if (json) process.stdout.write(JSON.stringify({ status: 'ok', message: 'OpenRouter key saved to ~/.nanaban/config.json' }) + '\n');
-  else createOutput(false, false).authStatus('config', 'OpenRouter key saved to ~/.nanaban/config.json', true);
+  if (json) process.stdout.write(JSON.stringify({ status: 'ok', message: 'OpenRouter key saved to ~/.slika/config.json' }) + '\n');
+  else createOutput(false, false).authStatus('config', 'OpenRouter key saved to ~/.slika/config.json', true);
 }

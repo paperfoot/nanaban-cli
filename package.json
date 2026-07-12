@@ -1,10 +1,11 @@
 {
-  "name": "nanaban",
-  "version": "4.3.0",
+  "name": "slika",
+  "version": "5.0.0",
   "type": "module",
-  "description": "Image generation from the terminal — GPT Image 2 (free on ChatGPT Plus/Pro via Codex OAuth), Nano Banana (Gemini), and GPT-5 Image, routed through one CLI.",
+  "description": "Image generation from the terminal — GPT Image 2 (free on ChatGPT Plus/Pro via Codex OAuth), Nano Banana 2/Lite/Pro (Gemini), and GPT-5.x Image, routed through one CLI. Formerly published as nanaban.",
   "bin": {
-    "nanaban": "./bin/nanaban.mjs"
+    "slika": "./bin/slika.mjs",
+    "nanaban": "./bin/slika.mjs"
   },
   "files": [
     "bin/",
@@ -18,6 +19,7 @@
     "build:binaries": "./scripts/build-binaries.sh"
   },
   "keywords": [
+    "slika",
     "image-generation",
     "gpt-image-2",
     "gpt-image",
@@ -34,11 +36,11 @@
   "author": "Boris Djordjevic",
   "repository": {
     "type": "git",
-    "url": "https://github.com/paperfoot/nanaban-cli.git"
+    "url": "https://github.com/paperfoot/slika.git"
   },
-  "homepage": "https://github.com/paperfoot/nanaban-cli#readme",
+  "homepage": "https://github.com/paperfoot/slika#readme",
   "bugs": {
-    "url": "https://github.com/paperfoot/nanaban-cli/issues"
+    "url": "https://github.com/paperfoot/slika/issues"
   },
   "license": "MIT",
   "engines": {

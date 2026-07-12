@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Single command to bump nanaban's version across every place it lives:
+# Single command to bump slika's version across every place it lives:
 #   - package.json            (npm)
 #   - src/version.ts          (runtime constant; embedded in bun binaries)
-#   - Formula/nanaban.rb      (Homebrew formula template)
+#   - Formula/slika.rb      (Homebrew formula template)
 #
 # The release workflow (.github/workflows/release.yml) double-checks these
 # are in sync with the pushed tag and fails the build on any mismatch.
@@ -42,19 +42,19 @@ node -e "
   fs.writeFileSync('src/version.ts', t);
 "
 
-# Formula/nanaban.rb — update the version declaration AND every /releases/download/vX.Y.Z/ URL.
+# Formula/slika.rb — update the version declaration AND every /releases/download/vX.Y.Z/ URL.
 node -e "
   const fs = require('fs');
-  let t = fs.readFileSync('Formula/nanaban.rb', 'utf8');
+  let t = fs.readFileSync('Formula/slika.rb', 'utf8');
   t = t.replace(/version \"[^\"]+\"/, 'version \"$NEW\"');
   t = t.replace(/\\/download\\/v[0-9]+\\.[0-9]+\\.[0-9]+\\//g, '/download/v$NEW/');
-  fs.writeFileSync('Formula/nanaban.rb', t);
+  fs.writeFileSync('Formula/slika.rb', t);
 "
 
 echo "Bumped to $NEW across:"
 echo "  - package.json"
 echo "  - src/version.ts"
-echo "  - Formula/nanaban.rb"
+echo "  - Formula/slika.rb"
 echo
 echo "Next:"
 echo "  git commit -am \"bump: $NEW\""

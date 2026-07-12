@@ -11,18 +11,21 @@ export type ErrorCode =
   | 'TRANSPORT_UNAVAILABLE'
   | 'CAPABILITY_UNSUPPORTED';
 
+// Agent CLI Framework contract: 0 success · 1 transient (retry) ·
+// 2 config error (fix setup, don't retry) · 3 bad input (fix args) ·
+// 4 rate limited (wait, retry).
 const EXIT_CODES: Record<ErrorCode, number> = {
-  AUTH_MISSING: 1,
-  AUTH_INVALID: 1,
-  AUTH_EXPIRED: 1,
-  PROMPT_MISSING: 2,
-  IMAGE_NOT_FOUND: 2,
+  AUTH_MISSING: 2,
+  AUTH_INVALID: 2,
+  AUTH_EXPIRED: 2,
+  PROMPT_MISSING: 3,
+  IMAGE_NOT_FOUND: 3,
   GENERATION_FAILED: 1,
-  RATE_LIMITED: 1,
+  RATE_LIMITED: 4,
   NETWORK_ERROR: 1,
-  MODEL_NOT_FOUND: 2,
-  TRANSPORT_UNAVAILABLE: 1,
-  CAPABILITY_UNSUPPORTED: 2,
+  MODEL_NOT_FOUND: 3,
+  TRANSPORT_UNAVAILABLE: 2,
+  CAPABILITY_UNSUPPORTED: 3,
 };
 
 export class NB2Error extends Error {

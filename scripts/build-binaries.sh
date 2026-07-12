@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Build standalone nanaban binaries for every supported platform using bun.
+# Build standalone slika binaries for every supported platform using bun.
 # Output goes to ./dist/. Each binary is fully self-contained — no Node runtime
 # required — because `bun build --compile` embeds the bun interpreter alongside
 # the bundled app code.
@@ -38,34 +38,34 @@ build_one() {
 if [[ "${1:-all}" == "host" ]]; then
   # Map host arch to a bun target for quick local iteration.
   case "$(uname -s)-$(uname -m)" in
-    Darwin-arm64)  build_one bun-darwin-arm64  nanaban ;;
-    Darwin-x86_64) build_one bun-darwin-x64    nanaban ;;
-    Linux-x86_64)  build_one bun-linux-x64     nanaban ;;
-    Linux-aarch64) build_one bun-linux-arm64   nanaban ;;
+    Darwin-arm64)  build_one bun-darwin-arm64  slika ;;
+    Darwin-x86_64) build_one bun-darwin-x64    slika ;;
+    Linux-x86_64)  build_one bun-linux-x64     slika ;;
+    Linux-aarch64) build_one bun-linux-arm64   slika ;;
     *) echo "unsupported host"; exit 1 ;;
   esac
   exit 0
 fi
 
-build_one bun-darwin-arm64   "nanaban-darwin-arm64"
-build_one bun-darwin-x64     "nanaban-darwin-x64"
-build_one bun-linux-x64      "nanaban-linux-x64"
-build_one bun-linux-arm64    "nanaban-linux-arm64"
-build_one bun-windows-x64    "nanaban-windows-x64.exe"
+build_one bun-darwin-arm64   "slika-darwin-arm64"
+build_one bun-darwin-x64     "slika-darwin-x64"
+build_one bun-linux-x64      "slika-linux-x64"
+build_one bun-linux-arm64    "slika-linux-arm64"
+build_one bun-windows-x64    "slika-windows-x64.exe"
 
 echo
 echo "==> sha256"
-( cd dist && shasum -a 256 nanaban-* | tee SHA256SUMS.txt )
+( cd dist && shasum -a 256 slika-* | tee SHA256SUMS.txt )
 
 echo
 echo "==> versions"
 # Smoke-test the host binary only; cross-targets can't run here.
 case "$(uname -s)-$(uname -m)" in
-  Darwin-arm64)  ./dist/nanaban-darwin-arm64  --version ;;
-  Darwin-x86_64) ./dist/nanaban-darwin-x64    --version ;;
-  Linux-x86_64)  ./dist/nanaban-linux-x64     --version ;;
-  Linux-aarch64) ./dist/nanaban-linux-arm64   --version ;;
+  Darwin-arm64)  ./dist/slika-darwin-arm64  --version ;;
+  Darwin-x86_64) ./dist/slika-darwin-x64    --version ;;
+  Linux-x86_64)  ./dist/slika-linux-x64     --version ;;
+  Linux-aarch64) ./dist/slika-linux-arm64   --version ;;
 esac
 
 echo
-echo "Built nanaban $VERSION. Artefacts in ./dist/"
+echo "Built slika $VERSION. Artefacts in ./dist/"

@@ -128,21 +128,21 @@ export function createOutput(json: boolean, quiet: boolean): Output {
 function hintFor(code: string): string | null {
   switch (code) {
     case 'AUTH_MISSING':
-      return 'pick one: `codex login` (free gpt-image-2 via ChatGPT Plus/Pro) | `nanaban auth set-openrouter <key>` (one key reaches every OR-routed model) | set GEMINI_API_KEY / OPENROUTER_API_KEY.';
+      return 'pick one: `codex login` (free gpt-image-2 via ChatGPT Plus/Pro) | `slika auth set-openrouter <key>` (one key reaches every OR-routed model) | set GEMINI_API_KEY / OPENROUTER_API_KEY.';
     case 'AUTH_INVALID':
       return 'key or OAuth token was rejected. Refresh: Codex → `codex login`; OpenRouter → https://openrouter.ai/keys; Gemini → https://aistudio.google.com/apikey';
     case 'AUTH_EXPIRED':
       return 'OAuth token expired. Re-auth with `codex login` (for codex-oauth) or `gemini auth` (for gemini-direct), or set OPENROUTER_API_KEY to bypass OAuth entirely.';
     case 'RATE_LIMITED':
-      return 'add a second provider so nanaban can fall back automatically: `nanaban auth set-openrouter <key>` or set OPENROUTER_API_KEY.';
+      return 'add a second provider so slika can fall back automatically: `slika auth set-openrouter <key>` or set OPENROUTER_API_KEY.';
     case 'NETWORK_ERROR':
       return 'transient network or upstream failure. Retry, or add a second provider for automatic failover.';
     case 'TRANSPORT_UNAVAILABLE':
-      return 'the requested model cannot be reached with the auth you have. Run `nanaban auth` to see what IS reachable.';
+      return 'the requested model cannot be reached with the auth you have. Run `slika auth` to see what IS reachable.';
     case 'CAPABILITY_UNSUPPORTED':
-      return 'run `nanaban agent-info` to see each model\'s supported aspect ratios, sizes, and features.';
+      return 'run `slika agent-info` to see each model\'s supported aspect ratios, sizes, and features.';
     case 'MODEL_NOT_FOUND':
-      return 'run `nanaban agent-info` for the list of valid model ids and aliases.';
+      return 'run `slika agent-info` for the list of valid model ids and aliases.';
     default:
       return null;
   }

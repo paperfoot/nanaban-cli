@@ -3,7 +3,7 @@ import path from 'path';
 import { homedir } from 'os';
 import { OAuth2Client } from 'google-auth-library';
 import { GoogleGenAI } from '@google/genai';
-import { readConfig, getStoredKey, getStoredOpenRouterKey } from '../lib/config.js';
+import { readConfig, readConfigWithPath } from '../lib/config.js';
 import { NB2Error } from '../lib/errors.js';
 import type { ModelInfo, TransportId } from './models.js';
 import { TRANSPORT_PREFERENCE } from './models.js';
@@ -33,8 +33,8 @@ export interface AuthState {
 
 async function getOAuthClient(): Promise<OAuth2Client | null> {
   const config = await readConfig();
-  const clientId = process.env.NANABAN_OAUTH_CLIENT_ID || config.oauthClientId;
-  const clientSecret = process.env.NANABAN_OAUTH_CLIENT_SECRET || config.oauthClientSecret;
+  const clientId = process.env.SLIKA_OAUTH_CLIENT_ID || process.env.NANABAN_OAUTH_CLIENT_ID || config.oauthClientId;
+  const clientSecret = process.env.SLIKA_OAUTH_CLIENT_SECRET || process.env.NANABAN_OAUTH_CLIENT_SECRET || config.oauthClientSecret;
   if (!clientId || !clientSecret) return null;
 
   const oauthPath = path.join(homedir(), '.gemini', 'oauth_creds.json');
@@ -62,9 +62,9 @@ export async function detectAuth(): Promise<AuthState> {
       name: process.env.GEMINI_API_KEY ? 'GEMINI_API_KEY' : 'GOOGLE_API_KEY',
     };
   } else {
-    const stored = await getStoredKey();
-    if (stored) {
-      state.gemini = { type: 'config', key: stored, path: '~/.nanaban/config.json' };
+    const { config, path: configPath } = await readConfigWithPath();
+    if (config.apiKey && configPath) {
+      state.gemini = { type: 'config', key: config.apiKey, path: configPath };
     } else {
       const oauth = await getOAuthClient();
       if (oauth) {
@@ -77,9 +77,9 @@ export async function detectAuth(): Promise<AuthState> {
   if (envOR) {
     state.openRouter = { type: 'env', key: envOR, name: 'OPENROUTER_API_KEY' };
   } else {
-    const stored = await getStoredOpenRouterKey();
-    if (stored) {
-      state.openRouter = { type: 'config', key: stored, path: '~/.nanaban/config.json' };
+    const { config, path: configPath } = await readConfigWithPath();
+    if (config.openRouterKey && configPath) {
+      state.openRouter = { type: 'config', key: config.openRouterKey, path: configPath };
     }
   }
 

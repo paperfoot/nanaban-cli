@@ -32,7 +32,7 @@ describe('agent-info', () => {
     const { stdout, exitCode } = run(['agent-info']);
     assert.equal(exitCode, 0, 'agent-info should exit 0');
     const manifest = JSON.parse(stdout);
-    assert.equal(manifest.name, 'nanaban');
+    assert.equal(manifest.name, 'slika');
     assert.ok(manifest.version);
   });
 
@@ -46,6 +46,7 @@ describe('agent-info', () => {
     assert.ok(names.includes('auth set'), 'missing auth set');
     assert.ok(names.includes('agent-info'), 'missing agent-info');
     assert.ok(names.includes('skill install'), 'missing skill install');
+    assert.ok(names.includes('update'), 'missing update');
   });
 
   it('lists all error codes', () => {
@@ -116,11 +117,22 @@ describe('agent-info', () => {
     assert.match(manifest.output_contract.json_envelope.error, /hint/, 'error envelope must include hint');
   });
 
-  it('lists exit codes 0, 1, 2', () => {
+  it('lists framework exit codes 0-4', () => {
     const { stdout } = run(['agent-info']);
     const manifest = JSON.parse(stdout);
     const exitCodes = manifest.exit_codes.map((e: any) => e.code);
-    assert.deepEqual(exitCodes.sort(), [0, 1, 2]);
+    assert.deepEqual(exitCodes.sort(), [0, 1, 2, 3, 4]);
+    const rateLimited = manifest.error_codes.find((e: any) => e.code === 'RATE_LIMITED');
+    assert.equal(rateLimited.exit_code, 4, 'RATE_LIMITED must exit 4');
+    const authMissing = manifest.error_codes.find((e: any) => e.code === 'AUTH_MISSING');
+    assert.equal(authMissing.exit_code, 2, 'AUTH_MISSING is a config error (2)');
+    const badModel = manifest.error_codes.find((e: any) => e.code === 'MODEL_NOT_FOUND');
+    assert.equal(badModel.exit_code, 3, 'MODEL_NOT_FOUND is bad input (3)');
+  });
+
+  it('unknown model exits 3 (bad input)', () => {
+    const { exitCode } = run(['a prompt', '--model', 'does-not-exist', '--json']);
+    assert.equal(exitCode, 3);
   });
 
   it('lists env vars', () => {
@@ -135,7 +147,7 @@ describe('agent-info', () => {
   it('declares config path and format', () => {
     const { stdout } = run(['agent-info']);
     const manifest = JSON.parse(stdout);
-    assert.equal(manifest.config.path, '~/.nanaban/config.json');
+    assert.equal(manifest.config.path, '~/.slika/config.json');
     assert.equal(manifest.config.format, 'json');
   });
 });

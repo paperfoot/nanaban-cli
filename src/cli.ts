@@ -4,6 +4,7 @@ import { runEdit } from './commands/edit.js';
 import { runAuthStatus, runAuthSet, runAuthSetOpenRouter } from './commands/auth.js';
 import { runAgentInfo } from './commands/agent_info.js';
 import { runSkillInstall, runSkillStatus } from './commands/skill.js';
+import { runUpdate } from './commands/update.js';
 import { VERSION } from './version.js';
 
 const program = new Command();
@@ -11,7 +12,7 @@ const program = new Command();
 const ratiosHelp = '1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9, 1:4, 4:1, 1:8, 8:1 (aliases: square, wide, tall, ultrawide, panoramic, banner, portrait, story)';
 
 program
-  .name('nanaban')
+  .name('slika')
   .description('Image generation from the terminal — Nano Banana (Gemini) and GPT Image via one CLI')
   .version(VERSION, '-v, --version')
   .enablePositionalOptions()
@@ -63,7 +64,7 @@ const authCmd = new Command('auth')
 
 authCmd
   .command('set <key>')
-  .description('store Gemini API key in ~/.nanaban/config.json')
+  .description('store Gemini API key in ~/.slika/config.json')
   .option('--json', 'JSON output', false)
   .action(async (key: string, opts) => {
     await runAuthSet(key, opts.json);
@@ -71,10 +72,17 @@ authCmd
 
 authCmd
   .command('set-openrouter <key>')
-  .description('store OpenRouter key in ~/.nanaban/config.json')
+  .description('store OpenRouter key in ~/.slika/config.json')
   .option('--json', 'JSON output', false)
   .action(async (key: string, opts) => {
     await runAuthSetOpenRouter(key, opts.json);
+  });
+
+const updateCmd = new Command('update')
+  .description('check for a newer release and print the exact upgrade command for your install channel')
+  .option('--json', 'JSON output', false)
+  .action(async (opts) => {
+    await runUpdate(opts.json);
   });
 
 const agentInfoCmd = new Command('agent-info')
@@ -103,6 +111,7 @@ skillCmd
 
 program.addCommand(editCmd);
 program.addCommand(authCmd);
+program.addCommand(updateCmd);
 program.addCommand(agentInfoCmd);
 program.addCommand(skillCmd);
 
