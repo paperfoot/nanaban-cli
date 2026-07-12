@@ -143,11 +143,13 @@ You only need **one** path configured. nanaban detects what's available and rout
 |----|--------|----------|---------------|-------|-----------|
 | `gpt-image-2` (default with Codex auth) | OpenAI | Strong text, agentic planning, high-fidelity | 1:1, 2:3, 3:2 | 1K only | **$0** on ChatGPT Plus/Pro |
 | `nb2` (default without Codex) | Gemini Nano Banana 2 | Fast, cheap, full ratio range | All + extended (1:4, 4:1, 1:8, 8:1) | 0.5K–4K | $0.067 |
+| `nb2-lite` | Gemini Nano Banana 2 Lite | Fastest + cheapest, high-volume drafts (~4s/image) | Standard 10 | 1K only | $0.034 |
 | `nb2-pro` (`--pro`) | Gemini Nano Banana Pro | Higher quality detail | Standard 10 | 1K–4K | $0.136 |
 | `gpt5` | OpenAI GPT-5 Image | Strong text/UI rendering | 1:1, 2:3, 3:2 | 1K only | $0.193 |
 | `gpt5-mini` | OpenAI GPT-5 Image Mini | Cheaper OpenAI option | 1:1, 2:3, 3:2 | 1K only | $0.041 |
+| `gpt54` | OpenAI GPT-5.4 Image 2 | GPT-5.4 reasoning + GPT Image 2 rendering | 1:1, 2:3, 3:2 | 1K only | $0.22 |
 
-Aliases: `gi2`/`img2`/`images2` → `gpt-image-2`, `pro` → `nb2-pro`, `flash` → `nb2`, `mini` → `gpt5-mini`, `gpt` → `gpt5`.
+Aliases: `gi2`/`img2`/`images2` → `gpt-image-2`, `pro` → `nb2-pro`, `flash` → `nb2`, `lite` → `nb2-lite`, `mini` → `gpt5-mini`, `gpt` → `gpt5`, `gpt5.4` → `gpt54`.
 
 Costs are typical per-image rates via the standard paid API path. **gpt-image-2 is free** when routed through Codex OAuth because it decrements your ChatGPT Plus/Pro image quota rather than an API balance.
 
@@ -158,11 +160,11 @@ nanaban detects credentials in this order and routes automatically. **Any single
 | Source | Reaches | How to set |
 |--------|---------|------------|
 | `~/.codex/auth.json` (Codex OAuth) | `gpt-image-2` at $0 | `codex login` |
-| `OPENROUTER_API_KEY` env | `nb2`, `nb2-pro`, `gpt5`, `gpt5-mini` | env var |
+| `OPENROUTER_API_KEY` env | `nb2`, `nb2-lite`, `nb2-pro`, `gpt5`, `gpt5-mini`, `gpt54` | env var |
 | Stored OpenRouter key | same as above | `nanaban auth set-openrouter <key>` |
-| `GEMINI_API_KEY` / `GOOGLE_API_KEY` | `nb2`, `nb2-pro` | env var |
-| Stored Gemini key | `nb2`, `nb2-pro` | `nanaban auth set <key>` |
-| Gemini OAuth | `nb2`, `nb2-pro` | `~/.gemini/oauth_creds.json` + OAuth client creds |
+| `GEMINI_API_KEY` / `GOOGLE_API_KEY` | `nb2`, `nb2-lite`, `nb2-pro` | env var |
+| Stored Gemini key | `nb2`, `nb2-lite`, `nb2-pro` | `nanaban auth set <key>` |
+| Gemini OAuth | `nb2`, `nb2-lite`, `nb2-pro` | `~/.gemini/oauth_creds.json` + OAuth client creds |
 
 ### Routing policy
 
@@ -170,7 +172,7 @@ nanaban detects credentials in this order and routes automatically. **Any single
 2. **Automatic fallback**: if the preferred transport returns a transient failure (`RATE_LIMITED`, `NETWORK_ERROR`, `AUTH_INVALID`, `AUTH_EXPIRED`) nanaban retries on the next available transport. The success envelope gains a `fallbacks` array so the caller sees what happened.
 3. **`--via <transport>` pins a route.** No fallback when explicit. Aliases: `codex`/`plus` → `codex-oauth`, `gemini`/`google` → `gemini-direct`, `or` → `openrouter`.
 
-**Recommended stack for agents**: `codex login` + `OPENROUTER_API_KEY`. gpt-image-2 is free, OpenRouter is the failover for other models. Check what's reachable with `nanaban auth`.
+**Recommended stack for agents**: `codex login` + `OPENROUTER_API_KEY`. gpt-image-2 is free, OpenRouter is the failover for other models. Check what's reachable with `nanaban auth`, or live-validate every credential (and see OpenRouter credits remaining) with `nanaban auth --check`.
 
 ## Usage
 
@@ -195,7 +197,7 @@ nanaban edit photo.png "add sunglasses"   # edit existing image (works with ever
 | `--ar <ratio>` | Aspect ratio (see table below) | `1:1` |
 | `--size <size>` | Resolution: `0.5k` `1k` `2k` `4k` (model-dependent) | `1k` |
 | `--pro` | Use Nano Banana Pro (alias for `--model nb2-pro`) | off |
-| `--model <id>` | `gpt-image-2`, `nb2`, `nb2-pro`, `gpt5`, `gpt5-mini` | auto (gpt-image-2 with Codex auth, else `nb2`) |
+| `--model <id>` | `gpt-image-2`, `nb2`, `nb2-lite`, `nb2-pro`, `gpt5`, `gpt5-mini`, `gpt54` | auto (gpt-image-2 with Codex auth, else `nb2`) |
 | `--via <transport>` | `codex-oauth`, `gemini-direct`, `openrouter` | auto |
 | `--neg <text>` | Negative prompt (Gemini only) | |
 | `-r, --ref <file>` | Reference image (style/content guidance) | |

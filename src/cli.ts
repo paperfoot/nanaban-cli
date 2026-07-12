@@ -20,7 +20,7 @@ program
   .option('--ar <ratio>', `aspect ratio: ${ratiosHelp}`, '1:1')
   .option('--size <size>', 'image size: 0.5k, 1k, 2k, 4k', '1k')
   .option('--pro', 'use Nano Banana Pro (alias for --model nb2-pro)', false)
-  .option('--model <id>', 'model: gpt-image-2 (default when Codex auth present) | nb2 | nb2-pro | gpt5 | gpt5-mini')
+  .option('--model <id>', 'model: gpt-image-2 (default when Codex auth present) | nb2 | nb2-lite | nb2-pro | gpt5 | gpt5-mini | gpt54')
   .option('--via <transport>', 'force transport: codex-oauth, gemini-direct, openrouter')
   .option('--neg <text>', 'negative prompt (Gemini only)')
   .option('-r, --ref <file...>', 'reference image path(s)')
@@ -43,7 +43,7 @@ const editCmd = new Command('edit')
   .option('--ar <ratio>', `aspect ratio: ${ratiosHelp}`, '1:1')
   .option('--size <size>', 'image size: 0.5k, 1k, 2k, 4k', '1k')
   .option('--pro', 'use Nano Banana Pro (alias for --model nb2-pro)', false)
-  .option('--model <id>', 'model: gpt-image-2 (default when Codex auth present) | nb2 | nb2-pro | gpt5 | gpt5-mini')
+  .option('--model <id>', 'model: gpt-image-2 (default when Codex auth present) | nb2 | nb2-lite | nb2-pro | gpt5 | gpt5-mini | gpt54')
   .option('--via <transport>', 'force transport: codex-oauth, gemini-direct, openrouter')
   .option('--neg <text>', 'negative prompt (Gemini only)')
   .option('--json', 'JSON output', false)
@@ -56,8 +56,9 @@ const editCmd = new Command('edit')
 const authCmd = new Command('auth')
   .description('show authentication status and reachable models')
   .option('--json', 'JSON output', false)
+  .option('--check', 'live-probe each credential (validates keys, reports OpenRouter credits)', false)
   .action(async (opts) => {
-    await runAuthStatus(opts.json);
+    await runAuthStatus(opts.json, opts.check);
   });
 
 authCmd

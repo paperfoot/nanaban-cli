@@ -67,7 +67,7 @@ export function runAgentInfo(): void {
           { name: '--ar', type: 'string', default: '1:1', description: 'Aspect ratio (see model capabilities)' },
           { name: '--size', type: 'string', default: '1k', description: 'Resolution: 0.5k, 1k, 2k, 4k (model-dependent)' },
           { name: '--pro', type: 'boolean', default: false, description: 'Alias for --model nb2-pro (Nano Banana Pro)' },
-          { name: '--model', type: 'string', default: 'auto (gpt-image-2 when Codex OAuth is detected, else nb2)', description: 'Model id: gpt-image-2 | nb2 | nb2-pro | gpt5 | gpt5-mini (aliases: gi2, pro, flash, gpt, mini)' },
+          { name: '--model', type: 'string', default: 'auto (gpt-image-2 when Codex OAuth is detected, else nb2)', description: 'Model id: gpt-image-2 | nb2 | nb2-lite | nb2-pro | gpt5 | gpt5-mini | gpt54 (aliases: gi2, pro, flash, lite, gpt, mini)' },
           { name: '--via', type: 'string', description: 'Force transport: codex-oauth | gemini-direct | openrouter (aliases: codex, plus, gemini, google, or)' },
           { name: '--neg', type: 'string', description: 'Negative prompt (Gemini only)' },
           { name: '--ref', short: '-r', type: 'string[]', description: 'Reference image path(s)' },
@@ -87,8 +87,8 @@ export function runAgentInfo(): void {
       },
       {
         name: 'auth',
-        description: 'Show authentication status and reachable models',
-        usage: 'nanaban auth',
+        description: 'Show authentication status and reachable models. With --check: live-probe every credential (validates Gemini/OpenRouter keys upstream, decodes Codex token expiry) and report OpenRouter credits remaining. JSON gains a `checks` array; status becomes `degraded` if any probe fails.',
+        usage: 'nanaban auth [--check] [--json]',
       },
       {
         name: 'auth set',
@@ -142,7 +142,7 @@ export function runAgentInfo(): void {
       { code: 'GENERATION_FAILED', description: 'Image generation failed (content policy, malformed request, or upstream error)', exit_code: 1, recovery: 'Usually a content-policy block or a malformed request — rewording the prompt often resolves it. Not retried on another transport because the other provider will reject for the same reason.' },
       { code: 'RATE_LIMITED', description: 'Upstream API rate limit exceeded (paid API tier cap, or ChatGPT sub image quota for codex-oauth)', exit_code: 1, recovery: 'Wait and retry. If you hit this on gpt-image-2 via codex-oauth, your ChatGPT Plus/Pro image quota is saturated — either wait for the quota window to reset or add `OPENROUTER_API_KEY` / `GEMINI_API_KEY` so nanaban can fall back to a paid transport automatically.' },
       { code: 'NETWORK_ERROR', description: 'Transient network / upstream 5xx', exit_code: 1, recovery: 'Retry. nanaban will also auto-fall-back to the next available transport on the same invocation.' },
-      { code: 'MODEL_NOT_FOUND', description: 'Unknown model id', exit_code: 2, recovery: 'Run `nanaban agent-info` and pick from the `models` array. Canonical ids: gpt-image-2, nb2, nb2-pro, gpt5, gpt5-mini.' },
+      { code: 'MODEL_NOT_FOUND', description: 'Unknown model id', exit_code: 2, recovery: 'Run `nanaban agent-info` and pick from the `models` array. Canonical ids: gpt-image-2, nb2, nb2-lite, nb2-pro, gpt5, gpt5-mini, gpt54.' },
       { code: 'TRANSPORT_UNAVAILABLE', description: 'Forced transport cannot reach the requested model (e.g. `--via openrouter --model gpt-image-2`)', exit_code: 1, recovery: 'Drop `--via` to let nanaban pick an available transport, or switch to a model that this transport reaches (see `transport_ids` in agent-info).' },
       { code: 'CAPABILITY_UNSUPPORTED', description: 'Model does not support the requested aspect ratio, size, or operation', exit_code: 2, recovery: 'Check the model\'s `capabilities` in `nanaban agent-info`. GPT Image 2 only supports aspect ratios 1:1 / 2:3 / 3:2 at 1K.' },
     ],

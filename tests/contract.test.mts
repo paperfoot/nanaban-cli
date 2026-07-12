@@ -57,19 +57,30 @@ describe('agent-info', () => {
     }
   });
 
-  it('declares all five models with capabilities', () => {
+  it('declares all seven models with capabilities', () => {
     const { stdout } = run(['agent-info']);
     const manifest = JSON.parse(stdout);
     assert.ok(Array.isArray(manifest.models));
     const ids = manifest.models.map((m: any) => m.id);
-    for (const expected of ['nb2', 'nb2-pro', 'gpt5', 'gpt5-mini', 'gpt-image-2']) {
+    for (const expected of ['nb2', 'nb2-lite', 'nb2-pro', 'gpt5', 'gpt5-mini', 'gpt54', 'gpt-image-2']) {
       assert.ok(ids.includes(expected), `missing model: ${expected}`);
     }
     const nb2 = manifest.models.find((m: any) => m.id === 'nb2');
     assert.ok(nb2.capabilities.aspect_ratios.includes('1:8'), 'nb2 should support extended ratios');
     assert.ok(nb2.capabilities.sizes.includes('0.5K'), 'nb2 should support 0.5K');
+    assert.ok(!nb2.transport_ids['gemini-direct'].includes('preview'), 'nb2 should use stable (non-preview) model id');
     const pro = manifest.models.find((m: any) => m.id === 'nb2-pro');
     assert.ok(!pro.capabilities.aspect_ratios.includes('1:8'), 'pro should not have extended ratios');
+    const lite = manifest.models.find((m: any) => m.id === 'nb2-lite');
+    assert.deepEqual(lite.capabilities.sizes, ['1K'], 'lite is 1K-only per Gemini API docs');
+    assert.ok(!lite.capabilities.aspect_ratios.includes('1:8'), 'lite should not have extended ratios');
+  });
+
+  it('auth declares the --check live probe', () => {
+    const { stdout } = run(['agent-info']);
+    const manifest = JSON.parse(stdout);
+    const auth = manifest.commands.find((c: any) => c.name === 'auth');
+    assert.match(auth.description, /--check/, 'auth command must document --check');
   });
 
   it('declares all three transports', () => {
