@@ -48,16 +48,102 @@ function reachableModels(state: AuthState): { model: ModelInfo; transports: stri
   }).filter(r => r.transports.length > 0);
 }
 
-export async function runAuthStatus(json: boolean): Promise<void> {
+interface CheckResult {
+  type: 'gemini' | 'openrouter' | 'codex-oauth';
+  ok: boolean;
+  detail: string;
+  credits_remaining_usd?: number;
+}
+
+// Live-probe each configured credential. `nanaban auth` without --check only
+// reports what is configured; keys can be present but revoked/expired, so
+// agents should run `auth --check` before assuming a transport works.
+async function liveCheck(state: AuthState): Promise<CheckResult[]> {
+  const checks: Promise<CheckResult>[] = [];
+
+  if (state.gemini) {
+    const g = state.gemini;
+    if (g.type === 'oauth') {
+      // detectAuth already exchanged the refresh token for an access token.
+      checks.push(Promise.resolve({ type: 'gemini', ok: true, detail: 'OAuth token refreshed successfully' }));
+    } else {
+      checks.push((async (): Promise<CheckResult> => {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=1&key=${g.key}`);
+          if (res.ok) return { type: 'gemini', ok: true, detail: 'API key accepted' };
+          const body = await res.json().catch(() => ({})) as { error?: { message?: string } };
+          return { type: 'gemini', ok: false, detail: body.error?.message || `HTTP ${res.status}` };
+        } catch (err: any) {
+          return { type: 'gemini', ok: false, detail: `probe failed: ${err.message}` };
+        }
+      })());
+    }
+  }
+
+  if (state.openRouter) {
+    const key = state.openRouter.key;
+    checks.push((async (): Promise<CheckResult> => {
+      try {
+        const res = await fetch('https://openrouter.ai/api/v1/credits', { headers: { Authorization: `Bearer ${key}` } });
+        if (!res.ok) return { type: 'openrouter', ok: false, detail: `HTTP ${res.status}` };
+        const body = await res.json() as { data?: { total_credits?: number; total_usage?: number } };
+        const remaining = (body.data?.total_credits ?? 0) - (body.data?.total_usage ?? 0);
+        return {
+          type: 'openrouter',
+          ok: true,
+          detail: `key accepted, $${remaining.toFixed(2)} credits remaining`,
+          credits_remaining_usd: Math.round(remaining * 100) / 100,
+        };
+      } catch (err: any) {
+        return { type: 'openrouter', ok: false, detail: `probe failed: ${err.message}` };
+      }
+    })());
+  }
+
+  if (state.codex) {
+    const token = state.codex.accessToken;
+    checks.push((async (): Promise<CheckResult> => {
+      try {
+        const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString()) as { exp?: number };
+        if (!payload.exp) return { type: 'codex-oauth', ok: true, detail: 'token present (no expiry claim)' };
+        const expires = new Date(payload.exp * 1000);
+        const ok = expires.getTime() > Date.now();
+        return {
+          type: 'codex-oauth',
+          ok,
+          detail: ok
+            ? `token valid until ${expires.toISOString()}`
+            : `token expired ${expires.toISOString()} — run \`codex login\` (or any codex command) to refresh`,
+        };
+      } catch {
+        return { type: 'codex-oauth', ok: false, detail: 'could not decode access token — run `codex login`' };
+      }
+    })());
+  }
+
+  return Promise.all(checks);
+}
+
+export async function runAuthStatus(json: boolean, check = false): Promise<void> {
   const state = await detectAuth();
   const methods = viewAuth(state);
   const reachable = reachableModels(state);
+  const checks = check ? await liveCheck(state) : null;
+
+  if (checks) {
+    for (const m of methods) {
+      const c = checks.find(c => c.type === m.type);
+      if (c) m.valid = c.ok;
+    }
+  }
 
   if (json) {
-    const status = methods.length === 0 ? 'none' : 'ok';
+    const anyFailed = checks?.some(c => !c.ok) ?? false;
+    const status = methods.length === 0 ? 'none' : anyFailed ? 'degraded' : 'ok';
     process.stdout.write(JSON.stringify({
       status,
       methods,
+      ...(checks ? { checks } : {}),
       reachable_models: reachable.map(r => ({ id: r.model.id, transports: r.transports })),
     }) + '\n');
     if (methods.length === 0) process.exit(1);
@@ -71,7 +157,9 @@ export async function runAuthStatus(json: boolean): Promise<void> {
   }
 
   for (const m of methods) {
-    out.authStatus(`${m.type}/${m.source}`, m.detail, m.valid);
+    const c = checks?.find(c => c.type === m.type);
+    const detail = c ? `${m.detail} — ${c.detail}` : m.detail;
+    out.authStatus(`${m.type}/${m.source}`, detail, m.valid);
   }
 
   process.stderr.write('\n' + pc.bold('Reachable models:') + '\n');

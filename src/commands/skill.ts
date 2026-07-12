@@ -18,6 +18,7 @@ nanaban "PROMPT"                        # generate (auto-names file, saves to CW
 nanaban "PROMPT" -o out.png --ar wide   # custom path, 16:9
 nanaban edit photo.png "add sunglasses" # edit an existing image
 nanaban auth                            # show what's reachable
+nanaban auth --check                    # live-validate keys, show credits
 nanaban agent-info                      # full capability manifest (use this)
 \\\`\\\`\\\`
 
