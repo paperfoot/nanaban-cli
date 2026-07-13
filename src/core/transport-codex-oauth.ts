@@ -8,8 +8,8 @@ const ENDPOINT = 'https://chatgpt.com/backend-api/codex/responses';
 // The Codex bridge rejects `gpt-image-2` as a top-level `model` — it must carry a
 // Codex "coding" model that invokes the `image_generation` tool, which internally
 // runs the current GPT Image model. `gpt-5.4` is the safe everyday default today;
-// override via SLIKA_CODEX_CARRIER (legacy: NANABAN_CODEX_CARRIER) if OpenAI rotates the list.
-const CARRIER_MODEL = process.env.SLIKA_CODEX_CARRIER ?? process.env.NANABAN_CODEX_CARRIER ?? 'gpt-5.4';
+// override via NANABAN_CODEX_CARRIER if OpenAI rotates the list.
+const CARRIER_MODEL = process.env.NANABAN_CODEX_CARRIER ?? 'gpt-5.4';
 
 // Cap on the in-flight SSE buffer so a chattery/hostile stream can't grow memory
 // without bound. 32 MiB is ~ an order of magnitude above a maximal 1536x1024 PNG
@@ -23,8 +23,8 @@ const MAX_SSE_BUFFER = 32 * 1024 * 1024;
 // one transient upstream blip doesn't fail the whole generate call. Env vars are
 // read at call time (not module load) so tests can tune them.
 const UPSTREAM_TRANSIENT = /stream disconnected before completion|an error occurred while processing your request/i;
-const maxRetries = () => Number(process.env.SLIKA_CODEX_MAX_RETRIES ?? process.env.NANABAN_CODEX_MAX_RETRIES ?? 2);
-const retryBaseMs = () => Number(process.env.SLIKA_CODEX_RETRY_MS ?? process.env.NANABAN_CODEX_RETRY_MS ?? 750);
+const maxRetries = () => Number(process.env.NANABAN_CODEX_MAX_RETRIES ?? 2);
+const retryBaseMs = () => Number(process.env.NANABAN_CODEX_RETRY_MS ?? 750);
 
 // gpt-image-2 via the Codex bridge accepts these three discrete output sizes.
 // Any aspect ratio outside this set is rejected up front by aspect.ts

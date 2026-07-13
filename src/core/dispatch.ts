@@ -58,7 +58,7 @@ function pickModel(opts: DispatchOptions, auth: AuthState): ModelInfo {
 
   const model = resolveModel(name);
   if (!model) {
-    throw new NB2Error('MODEL_NOT_FOUND', `Unknown model "${name}". Run \`slika agent-info\` to list available models.`);
+    throw new NB2Error('MODEL_NOT_FOUND', `Unknown model "${name}". Run \`nanaban agent-info\` to list available models.`);
   }
   return model;
 }
@@ -86,7 +86,7 @@ function noRoutesError(model: ModelInfo, auth: AuthState): NB2Error {
       ? 'Quick fix: run `codex login` (free via ChatGPT Plus/Pro). This model is only reachable via the Codex bridge.'
       : model.ids['codex-oauth']
         ? 'Quick fix: run `codex login` (free via ChatGPT Plus/Pro), or set OPENROUTER_API_KEY.'
-        : 'Quick fix: run `slika auth set-openrouter <key>` (one key reaches every OR-routed model), or set OPENROUTER_API_KEY / GEMINI_API_KEY.';
+        : 'Quick fix: run `nanaban auth set-openrouter <key>` (one key reaches every OR-routed model), or set OPENROUTER_API_KEY / GEMINI_API_KEY.';
     return new NB2Error(
       'AUTH_MISSING',
       `No authentication configured. ${model.display} needs one of ${needs.join(' or ')}. ${hint}`,

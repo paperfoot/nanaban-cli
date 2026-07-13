@@ -3,10 +3,9 @@ import { VERSION } from '../version.js';
 
 export function runAgentInfo(): void {
   const manifest = {
-    name: 'slika',
-    former_name: 'nanaban',
+    name: 'nanaban',
     version: VERSION,
-    description: 'Image generation from the terminal — GPT Image 2, Nano Banana 2/Lite/Pro (Gemini), and GPT-5.x Image via one CLI. slika is the router, not a model; `nanaban` still works as a bin alias.',
+    description: 'Image generation from the terminal — GPT Image 2, Nano Banana 2/Lite/Pro (Gemini), and GPT-5.x Image via one CLI. nanaban is the router CLI, not a model — Nano Banana is one of the model families it serves.',
     transports: [
       {
         id: 'codex-oauth',
@@ -61,7 +60,7 @@ export function runAgentInfo(): void {
       {
         name: 'generate',
         description: 'Generate an image from a text prompt (default command)',
-        usage: 'slika "prompt" [flags]',
+        usage: 'nanaban "prompt" [flags]',
         args: [{ name: 'prompt', type: 'string', required: true, description: 'Image generation prompt' }],
         flags: [
           { name: '--output', short: '-o', type: 'string', description: 'Output file path (auto-generated from prompt if omitted)' },
@@ -80,7 +79,7 @@ export function runAgentInfo(): void {
       {
         name: 'edit',
         description: 'Edit an existing image with a text instruction',
-        usage: 'slika edit <image> "prompt" [flags]',
+        usage: 'nanaban edit <image> "prompt" [flags]',
         args: [
           { name: 'image', type: 'string', required: true, description: 'Path to image to edit' },
           { name: 'prompt', type: 'string', required: true, description: 'Edit instructions' },
@@ -89,50 +88,50 @@ export function runAgentInfo(): void {
       {
         name: 'auth',
         description: 'Show authentication status and reachable models. With --check: live-probe every credential (validates Gemini/OpenRouter keys upstream, decodes Codex token expiry) and report OpenRouter credits remaining. JSON gains a `checks` array; status becomes `degraded` if any probe fails.',
-        usage: 'slika auth [--check] [--json]',
+        usage: 'nanaban auth [--check] [--json]',
       },
       {
         name: 'auth set',
-        description: 'Store Gemini API key in ~/.slika/config.json',
-        usage: 'slika auth set <key>',
+        description: 'Store Gemini API key in ~/.nanaban/config.json',
+        usage: 'nanaban auth set <key>',
       },
       {
         name: 'auth set-openrouter',
-        description: 'Store OpenRouter key in ~/.slika/config.json',
-        usage: 'slika auth set-openrouter <key>',
+        description: 'Store OpenRouter key in ~/.nanaban/config.json',
+        usage: 'nanaban auth set-openrouter <key>',
       },
       {
         name: 'update',
         description: 'Check the latest GitHub release and print the exact upgrade command for the detected install channel (homebrew | npm | standalone binary). Never self-replaces managed installs.',
-        usage: 'slika update [--json]',
+        usage: 'nanaban update [--json]',
       },
       {
         name: 'agent-info',
         description: 'Machine-readable capability manifest (this output)',
-        usage: 'slika agent-info',
+        usage: 'nanaban agent-info',
       },
       {
         name: 'skill install',
         description: 'Install agent skill file to Claude, Codex, and Gemini skill directories',
-        usage: 'slika skill install',
+        usage: 'nanaban skill install',
       },
       {
         name: 'skill status',
-        description: 'Show which skill directories have slika installed',
-        usage: 'slika skill status',
+        description: 'Show which skill directories have nanaban installed',
+        usage: 'nanaban skill status',
       },
     ],
     env_vars: [
       { name: 'GEMINI_API_KEY', description: 'Gemini API key (gemini-direct transport)' },
       { name: 'GOOGLE_API_KEY', description: 'Alternative Gemini API key' },
       { name: 'OPENROUTER_API_KEY', description: 'OpenRouter key — reaches Nano Banana + GPT-5 Image (not gpt-image-2)' },
-      { name: 'SLIKA_OAUTH_CLIENT_ID', description: 'OAuth client ID for Gemini CLI auth (legacy NANABAN_OAUTH_CLIENT_ID still honored)' },
-      { name: 'SLIKA_OAUTH_CLIENT_SECRET', description: 'OAuth client secret for Gemini CLI auth (legacy NANABAN_OAUTH_CLIENT_SECRET still honored)' },
-      { name: 'SLIKA_CODEX_CARRIER', description: 'Escape hatch — overrides the Codex carrier model used by codex-oauth (default: gpt-5.4). Change if OpenAI rotates the Codex model list and gpt-5.4 stops being accepted. Legacy NANABAN_CODEX_CARRIER still honored.' },
+      { name: 'NANABAN_OAUTH_CLIENT_ID', description: 'OAuth client ID for Gemini CLI auth' },
+      { name: 'NANABAN_OAUTH_CLIENT_SECRET', description: 'OAuth client secret for Gemini CLI auth' },
+      { name: 'NANABAN_CODEX_CARRIER', description: 'Escape hatch — overrides the Codex carrier model used by codex-oauth (default: gpt-5.4). Change if OpenAI rotates the Codex model list and gpt-5.4 stops being accepted.' },
     ],
     auth_files: [
       { path: '~/.codex/auth.json', description: 'ChatGPT Plus/Pro OAuth bundle from `codex login` — enables codex-oauth transport (gpt-image-2, billed against ChatGPT sub)' },
-      { path: '~/.gemini/oauth_creds.json', description: 'Gemini CLI OAuth credentials (enables gemini-direct when SLIKA_OAUTH_CLIENT_ID/SECRET are set)' },
+      { path: '~/.gemini/oauth_creds.json', description: 'Gemini CLI OAuth credentials (enables gemini-direct when NANABAN_OAUTH_CLIENT_ID/SECRET are set)' },
     ],
     exit_codes: [
       { code: 0, meaning: 'success' },
@@ -142,19 +141,19 @@ export function runAgentInfo(): void {
       { code: 4, meaning: 'rate limited — wait, then retry' },
     ],
     error_codes: [
-      { code: 'AUTH_MISSING', description: 'No valid authentication found for the requested model', exit_code: 2, recovery: 'Run one of: `codex login` (enables gpt-image-2 at $0 via ChatGPT Plus/Pro), `slika auth set-openrouter <key>` (enables Nano Banana + GPT-5 Image), or set GEMINI_API_KEY / OPENROUTER_API_KEY in the environment.' },
-      { code: 'AUTH_INVALID', description: 'Key or OAuth token was rejected by the upstream provider', exit_code: 2, recovery: 'Refresh the rejected credential: Codex → `codex login`; OpenRouter → https://openrouter.ai/keys; Gemini → https://aistudio.google.com/apikey. If another provider is already configured, slika will auto-fall-back transiently.' },
+      { code: 'AUTH_MISSING', description: 'No valid authentication found for the requested model', exit_code: 2, recovery: 'Run one of: `codex login` (enables gpt-image-2 at $0 via ChatGPT Plus/Pro), `nanaban auth set-openrouter <key>` (enables Nano Banana + GPT-5 Image), or set GEMINI_API_KEY / OPENROUTER_API_KEY in the environment.' },
+      { code: 'AUTH_INVALID', description: 'Key or OAuth token was rejected by the upstream provider', exit_code: 2, recovery: 'Refresh the rejected credential: Codex → `codex login`; OpenRouter → https://openrouter.ai/keys; Gemini → https://aistudio.google.com/apikey. If another provider is already configured, nanaban will auto-fall-back transiently.' },
       { code: 'AUTH_EXPIRED', description: 'OAuth token expired', exit_code: 2, recovery: 'Re-auth with `codex login` (codex-oauth) or `gemini auth` (gemini-direct), or set OPENROUTER_API_KEY to bypass OAuth entirely.' },
-      { code: 'PROMPT_MISSING', description: 'No prompt provided', exit_code: 3, recovery: 'Pass a prompt as the first positional argument: `slika "your prompt"`.' },
-      { code: 'IMAGE_NOT_FOUND', description: 'Source image does not exist', exit_code: 3, recovery: 'Verify the path passed to `slika edit <image>` or `-r <file>` exists and is readable.' },
+      { code: 'PROMPT_MISSING', description: 'No prompt provided', exit_code: 3, recovery: 'Pass a prompt as the first positional argument: `nanaban "your prompt"`.' },
+      { code: 'IMAGE_NOT_FOUND', description: 'Source image does not exist', exit_code: 3, recovery: 'Verify the path passed to `nanaban edit <image>` or `-r <file>` exists and is readable.' },
       { code: 'GENERATION_FAILED', description: 'Image generation failed (content policy, malformed request, or upstream error)', exit_code: 1, recovery: 'Usually a content-policy block or a malformed request — rewording the prompt often resolves it. Not retried on another transport because the other provider will reject for the same reason.' },
-      { code: 'RATE_LIMITED', description: 'Upstream API rate limit exceeded (paid API tier cap, or ChatGPT sub image quota for codex-oauth)', exit_code: 4, recovery: 'Wait and retry. If you hit this on gpt-image-2 via codex-oauth, your ChatGPT Plus/Pro image quota is saturated — either wait for the quota window to reset or add `OPENROUTER_API_KEY` / `GEMINI_API_KEY` so slika can fall back to a paid transport automatically.' },
-      { code: 'NETWORK_ERROR', description: 'Transient network / upstream 5xx', exit_code: 1, recovery: 'Retry. slika will also auto-fall-back to the next available transport on the same invocation.' },
-      { code: 'MODEL_NOT_FOUND', description: 'Unknown model id', exit_code: 3, recovery: 'Run `slika agent-info` and pick from the `models` array. Canonical ids: gpt-image-2, nb2, nb2-lite, nb2-pro, gpt5, gpt5-mini, gpt54.' },
-      { code: 'TRANSPORT_UNAVAILABLE', description: 'Forced transport cannot reach the requested model (e.g. `--via openrouter --model gpt-image-2`)', exit_code: 2, recovery: 'Drop `--via` to let slika pick an available transport, or switch to a model that this transport reaches (see `transport_ids` in agent-info).' },
-      { code: 'CAPABILITY_UNSUPPORTED', description: 'Model does not support the requested aspect ratio, size, or operation', exit_code: 3, recovery: 'Check the model\'s `capabilities` in `slika agent-info`. GPT Image 2 only supports aspect ratios 1:1 / 2:3 / 3:2 at 1K.' },
+      { code: 'RATE_LIMITED', description: 'Upstream API rate limit exceeded (paid API tier cap, or ChatGPT sub image quota for codex-oauth)', exit_code: 4, recovery: 'Wait and retry. If you hit this on gpt-image-2 via codex-oauth, your ChatGPT Plus/Pro image quota is saturated — either wait for the quota window to reset or add `OPENROUTER_API_KEY` / `GEMINI_API_KEY` so nanaban can fall back to a paid transport automatically.' },
+      { code: 'NETWORK_ERROR', description: 'Transient network / upstream 5xx', exit_code: 1, recovery: 'Retry. nanaban will also auto-fall-back to the next available transport on the same invocation.' },
+      { code: 'MODEL_NOT_FOUND', description: 'Unknown model id', exit_code: 3, recovery: 'Run `nanaban agent-info` and pick from the `models` array. Canonical ids: gpt-image-2, nb2, nb2-lite, nb2-pro, gpt5, gpt5-mini, gpt54.' },
+      { code: 'TRANSPORT_UNAVAILABLE', description: 'Forced transport cannot reach the requested model (e.g. `--via openrouter --model gpt-image-2`)', exit_code: 2, recovery: 'Drop `--via` to let nanaban pick an available transport, or switch to a model that this transport reaches (see `transport_ids` in agent-info).' },
+      { code: 'CAPABILITY_UNSUPPORTED', description: 'Model does not support the requested aspect ratio, size, or operation', exit_code: 3, recovery: 'Check the model\'s `capabilities` in `nanaban agent-info`. GPT Image 2 only supports aspect ratios 1:1 / 2:3 / 3:2 at 1K.' },
     ],
-    config: { path: '~/.slika/config.json', format: 'json', legacy_path: '~/.nanaban/config.json (read as fallback; writes migrate to ~/.slika)' },
+    config: { path: '~/.nanaban/config.json', format: 'json' },
     output_contract: {
       stdout: 'File path only (pipeable). With --json: full JSON envelope.',
       stderr: 'Metadata, spinner, errors (human mode only)',
@@ -165,8 +164,8 @@ export function runAgentInfo(): void {
         error_notes: '`hint` is a human-readable recovery suggestion included on every error. Agents should read it — it names the exact command to run or env var to set.',
       },
     },
-    install: 'npm install -g slika (or: brew install paperfoot/tap/slika)',
-    repository: 'https://github.com/paperfoot/slika',
+    install: 'npm install -g nanaban (or: brew install paperfoot/tap/nanaban)',
+    repository: 'https://github.com/paperfoot/nanaban',
   };
 
   process.stdout.write(JSON.stringify(manifest, null, 2) + '\n');

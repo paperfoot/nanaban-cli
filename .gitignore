@@ -7,5 +7,5 @@ dist/
 *.jpg
 *.jpeg
 *.webp
-!slika_logo.png
+!nanaban_logo.png
 !examples/*.png

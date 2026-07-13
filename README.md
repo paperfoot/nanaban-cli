@@ -1,32 +1,32 @@
 <p align="center">
-  <img src="slika_logo.png" alt="slika — image generation from the terminal" width="600">
+  <img src="nanaban_logo.png" alt="nanaban — image generation from the terminal" width="600">
 </p>
 
-<h1 align="center">slika</h1>
+<h1 align="center">nanaban</h1>
 
 <p align="center">
   Image generation from the terminal. <strong>GPT Image 2 free on your ChatGPT Plus/Pro subscription</strong> — no OpenAI API key, no metered billing. Plus Nano Banana (Gemini) and GPT-5 Image. One CLI.
 </p>
 
 <p align="center">
-  <a href="https://github.com/paperfoot/slika/stargazers"><img src="https://img.shields.io/github/stars/paperfoot/slika?style=for-the-badge&logo=github&label=%E2%AD%90%20Star%20this%20repo&color=yellow" alt="Star this repo"></a>
+  <a href="https://github.com/paperfoot/nanaban-cli/stargazers"><img src="https://img.shields.io/github/stars/paperfoot/nanaban?style=for-the-badge&logo=github&label=%E2%AD%90%20Star%20this%20repo&color=yellow" alt="Star this repo"></a>
   &nbsp;
   <a href="https://x.com/longevityboris"><img src="https://img.shields.io/badge/Follow_%40longevityboris-000000?style=for-the-badge&logo=x&logoColor=white" alt="Follow @longevityboris on X"></a>
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/slika"><img src="https://img.shields.io/npm/v/slika?style=for-the-badge&logo=npm&logoColor=white&label=npm&color=CB3837" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/slika"><img src="https://img.shields.io/npm/dm/slika?style=for-the-badge&logo=npm&logoColor=white&color=CB3837" alt="npm downloads"></a>
-  <a href="https://github.com/paperfoot/slika/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/slika?style=for-the-badge&logo=node.js&logoColor=white&color=339933" alt="Node.js version"></a>
+  <a href="https://www.npmjs.com/package/nanaban"><img src="https://img.shields.io/npm/v/nanaban?style=for-the-badge&logo=npm&logoColor=white&label=npm&color=CB3837" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/nanaban"><img src="https://img.shields.io/npm/dm/nanaban?style=for-the-badge&logo=npm&logoColor=white&color=CB3837" alt="npm downloads"></a>
+  <a href="https://github.com/paperfoot/nanaban-cli/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" alt="MIT License"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/nanaban?style=for-the-badge&logo=node.js&logoColor=white&color=339933" alt="Node.js version"></a>
 </p>
 
 <p align="center">
-  Type a prompt. Get an image. One command, zero browser tabs. slika is a CLI for AI image generation that works for humans typing prompts and LLM agents calling <code>--json</code>. It runs OpenAI's GPT Image 2 (free against your ChatGPT Plus/Pro subscription via Codex OAuth), Google's Nano Banana (Gemini), and OpenAI GPT-5 Image — pick whichever, or let slika choose based on the auth you have.
+  Type a prompt. Get an image. One command, zero browser tabs. nanaban is a CLI for AI image generation that works for humans typing prompts and LLM agents calling <code>--json</code>. It runs OpenAI's GPT Image 2 (free against your ChatGPT Plus/Pro subscription via Codex OAuth), Google's Nano Banana (Gemini), and OpenAI GPT-5 Image — pick whichever, or let nanaban choose based on the auth you have.
 </p>
 
 <p align="center">
-  <a href="#install">Install</a> · <a href="#quick-start">Quick Start</a> · <a href="#models">Models</a> · <a href="#auth">Auth</a> · <a href="#usage">Usage</a> · <a href="#for-llm-agents-and-scripts">Agent Mode</a> · <a href="#formerly-nanaban">Formerly nanaban</a> · <a href="#contributing">Contributing</a>
+  <a href="#install">Install</a> · <a href="#quick-start">Quick Start</a> · <a href="#models">Models</a> · <a href="#auth">Auth</a> · <a href="#usage">Usage</a> · <a href="#for-llm-agents-and-scripts">Agent Mode</a> · <a href="#contributing">Contributing</a>
 </p>
 
 ---
@@ -37,33 +37,33 @@
 <tr>
 <td align="center">
 <img src="examples/cyberpunk_tokyo.png" width="350"><br>
-<code>slika "cyberpunk tokyo street neon rain" --ar wide</code>
+<code>nanaban "cyberpunk tokyo street neon rain" --ar wide</code>
 </td>
 <td align="center">
 <img src="examples/fox_ink.png" width="250"><br>
-<code>slika "minimalist single line fox"</code>
+<code>nanaban "minimalist single line fox"</code>
 </td>
 <td align="center">
 <img src="examples/product_mug.png" width="250"><br>
-<code>slika "product photo white ceramic mug"</code>
+<code>nanaban "product photo white ceramic mug"</code>
 </td>
 </tr>
 </table>
 
-Every image on this page was generated with slika. Straight from the terminal.
+Every image on this page was generated with nanaban. Straight from the terminal.
 
 ## Why This Exists
 
 Most AI image generators make you open a browser, wait in a queue, click through UI, and download manually. That workflow breaks the second you need images inside a script, a CI pipeline, or an agent loop.
 
-slika fixes that:
+nanaban fixes that:
 
 - **One command** — type your prompt, get a file. No browser, no signup flow, no queue.
-- **Free GPT Image 2** for ChatGPT Plus/Pro subscribers. slika reads the OAuth token written by `codex login` and hits the private Codex backend (`chatgpt.com/backend-api/codex/responses`) on your behalf — every generation decrements your ChatGPT image quota, **not** your OpenAI API balance. Zero marginal cost, no API key needed.
+- **Free GPT Image 2** for ChatGPT Plus/Pro subscribers. nanaban reads the OAuth token written by `codex login` and hits the private Codex backend (`chatgpt.com/backend-api/codex/responses`) on your behalf — every generation decrements your ChatGPT image quota, **not** your OpenAI API balance. Zero marginal cost, no API key needed.
 - **Three model families, one CLI** — GPT Image 2 (OpenAI's April 2026 flagship) when Codex auth is present, Nano Banana (Gemini) for the cheap/fast default with extended ratios, GPT-5 Image for OpenAI's text/UI work via OpenRouter.
 - **Auto-names files** — `"a fox in a snowy forest at dawn"` becomes `fox_snowy_forest_dawn.png`.
-- **Built for scripts** — stdout is always the file path. `slika "a cat" | xargs open` just works.
-- **Built for LLM agents** — `--json` gives structured output with cost. `slika agent-info` is a machine-readable manifest of every model, flag, transport, and error code (with per-code recovery instructions).
+- **Built for scripts** — stdout is always the file path. `nanaban "a cat" | xargs open` just works.
+- **Built for LLM agents** — `--json` gives structured output with cost. `nanaban agent-info` is a machine-readable manifest of every model, flag, transport, and error code (with per-code recovery instructions).
 - **Tiny footprint** — one Node package, or one standalone binary with no runtime required.
 
 ## Install
@@ -73,36 +73,36 @@ Three options, pick whichever matches how you like to install CLIs:
 **Homebrew** (macOS/Linux, no Node needed):
 
 ```bash
-brew install paperfoot/tap/slika
+brew install paperfoot/tap/nanaban
 ```
 
 **Standalone binary** (no Node needed, pick your platform):
 
 ```bash
 # macOS (Apple Silicon)
-curl -L https://github.com/paperfoot/slika/releases/latest/download/slika-darwin-arm64 -o /usr/local/bin/slika && chmod +x /usr/local/bin/slika
+curl -L https://github.com/paperfoot/nanaban-cli/releases/latest/download/nanaban-darwin-arm64 -o /usr/local/bin/nanaban && chmod +x /usr/local/bin/nanaban
 
 # macOS (Intel)
-curl -L https://github.com/paperfoot/slika/releases/latest/download/slika-darwin-x64 -o /usr/local/bin/slika && chmod +x /usr/local/bin/slika
+curl -L https://github.com/paperfoot/nanaban-cli/releases/latest/download/nanaban-darwin-x64 -o /usr/local/bin/nanaban && chmod +x /usr/local/bin/nanaban
 
 # Linux (x86_64)
-curl -L https://github.com/paperfoot/slika/releases/latest/download/slika-linux-x64 -o /usr/local/bin/slika && chmod +x /usr/local/bin/slika
+curl -L https://github.com/paperfoot/nanaban-cli/releases/latest/download/nanaban-linux-x64 -o /usr/local/bin/nanaban && chmod +x /usr/local/bin/nanaban
 
 # Linux (arm64)
-curl -L https://github.com/paperfoot/slika/releases/latest/download/slika-linux-arm64 -o /usr/local/bin/slika && chmod +x /usr/local/bin/slika
+curl -L https://github.com/paperfoot/nanaban-cli/releases/latest/download/nanaban-linux-arm64 -o /usr/local/bin/nanaban && chmod +x /usr/local/bin/nanaban
 ```
 
 **npm** (if you already have Node 18+):
 
 ```bash
-npm install -g slika
+npm install -g nanaban
 ```
 
 **From source:**
 
 ```bash
-git clone https://github.com/paperfoot/slika.git
-cd slika && npm install && npm link
+git clone https://github.com/paperfoot/nanaban-cli.git
+cd nanaban && npm install && npm link
 ```
 
 ## Quick Start
@@ -115,7 +115,7 @@ Three paths. Pick the one you already have credentials for:
 # One-time: log in with your ChatGPT account
 codex login
 # Then just:
-slika "a fox in snow"          # uses GPT Image 2, billed to your ChatGPT sub ($0)
+nanaban "a fox in snow"          # uses GPT Image 2, billed to your ChatGPT sub ($0)
 ```
 
 **OpenRouter** (one key for Nano Banana AND GPT-5 Image):
@@ -123,19 +123,19 @@ slika "a fox in snow"          # uses GPT Image 2, billed to your ChatGPT sub ($
 ```bash
 # Get a key from https://openrouter.ai/keys
 export OPENROUTER_API_KEY=sk-or-v1-...
-slika "a fox in snow"                    # uses Nano Banana 2
-slika "a fox in snow" --model gpt5-mini  # uses GPT-5 Image Mini
+nanaban "a fox in snow"                    # uses Nano Banana 2
+nanaban "a fox in snow" --model gpt5-mini  # uses GPT-5 Image Mini
 ```
 
 **Gemini direct** (free tier available):
 
 ```bash
 # Get a key from https://aistudio.google.com/apikey
-slika auth set AIzaSy...
-slika "a fox in snow"
+nanaban auth set AIzaSy...
+nanaban "a fox in snow"
 ```
 
-You only need **one** path configured. slika detects what's available and routes automatically. Run `slika auth` to see what's reachable. The default model auto-switches to `gpt-image-2` when Codex auth is present, otherwise `nb2`.
+You only need **one** path configured. nanaban detects what's available and routes automatically. Run `nanaban auth` to see what's reachable. The default model auto-switches to `gpt-image-2` when Codex auth is present, otherwise `nb2`.
 
 ## Models
 
@@ -155,38 +155,38 @@ Costs are typical per-image rates via the standard paid API path. **gpt-image-2 
 
 ## Auth
 
-slika detects credentials in this order and routes automatically. **Any single path is enough.**
+nanaban detects credentials in this order and routes automatically. **Any single path is enough.**
 
 | Source | Reaches | How to set |
 |--------|---------|------------|
 | `~/.codex/auth.json` (Codex OAuth) | `gpt-image-2` at $0 | `codex login` |
 | `OPENROUTER_API_KEY` env | `nb2`, `nb2-lite`, `nb2-pro`, `gpt5`, `gpt5-mini`, `gpt54` | env var |
-| Stored OpenRouter key | same as above | `slika auth set-openrouter <key>` |
+| Stored OpenRouter key | same as above | `nanaban auth set-openrouter <key>` |
 | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | `nb2`, `nb2-lite`, `nb2-pro` | env var |
-| Stored Gemini key | `nb2`, `nb2-lite`, `nb2-pro` | `slika auth set <key>` |
+| Stored Gemini key | `nb2`, `nb2-lite`, `nb2-pro` | `nanaban auth set <key>` |
 | Gemini OAuth | `nb2`, `nb2-lite`, `nb2-pro` | `~/.gemini/oauth_creds.json` + OAuth client creds |
 
 ### Routing policy
 
 1. **Preference order**: `codex-oauth` → `openrouter` → `gemini-direct`. `codex-oauth` comes first because it's free for Plus/Pro subscribers.
-2. **Automatic fallback**: if the preferred transport returns a transient failure (`RATE_LIMITED`, `NETWORK_ERROR`, `AUTH_INVALID`, `AUTH_EXPIRED`) slika retries on the next available transport. The success envelope gains a `fallbacks` array so the caller sees what happened.
+2. **Automatic fallback**: if the preferred transport returns a transient failure (`RATE_LIMITED`, `NETWORK_ERROR`, `AUTH_INVALID`, `AUTH_EXPIRED`) nanaban retries on the next available transport. The success envelope gains a `fallbacks` array so the caller sees what happened.
 3. **`--via <transport>` pins a route.** No fallback when explicit. Aliases: `codex`/`plus` → `codex-oauth`, `gemini`/`google` → `gemini-direct`, `or` → `openrouter`.
 
-**Recommended stack for agents**: `codex login` + `OPENROUTER_API_KEY`. gpt-image-2 is free, OpenRouter is the failover for other models. Check what's reachable with `slika auth`, or live-validate every credential (and see OpenRouter credits remaining) with `slika auth --check`.
+**Recommended stack for agents**: `codex login` + `OPENROUTER_API_KEY`. gpt-image-2 is free, OpenRouter is the failover for other models. Check what's reachable with `nanaban auth`, or live-validate every credential (and see OpenRouter credits remaining) with `nanaban auth --check`.
 
 ## Usage
 
 ```bash
-slika "prompt"                          # auto-picks best model for your auth
-slika "prompt" -o sunset.png            # custom filename
-slika "prompt" --ar wide --size 2k      # 16:9, high resolution (Gemini only)
-slika "prompt" --pro                    # Nano Banana Pro
-slika "prompt" --model gpt-image-2      # force GPT Image 2 (needs Codex auth)
-slika "prompt" --model gpt5-mini        # force GPT-5 Image Mini
-slika "prompt" --via codex-oauth        # force the ChatGPT sub route
-slika "prompt" --neg "blurry, text"     # negative prompt (Gemini only)
-slika "prompt" -r style.png             # reference image
-slika edit photo.png "add sunglasses"   # edit existing image (works with every model)
+nanaban "prompt"                          # auto-picks best model for your auth
+nanaban "prompt" -o sunset.png            # custom filename
+nanaban "prompt" --ar wide --size 2k      # 16:9, high resolution (Gemini only)
+nanaban "prompt" --pro                    # Nano Banana Pro
+nanaban "prompt" --model gpt-image-2      # force GPT Image 2 (needs Codex auth)
+nanaban "prompt" --model gpt5-mini        # force GPT-5 Image Mini
+nanaban "prompt" --via codex-oauth        # force the ChatGPT sub route
+nanaban "prompt" --neg "blurry, text"     # negative prompt (Gemini only)
+nanaban "prompt" -r style.png             # reference image
+nanaban edit photo.png "add sunglasses"   # edit existing image (works with every model)
 ```
 
 ### Flags
@@ -226,16 +226,16 @@ slika edit photo.png "add sunglasses"   # edit existing image (works with every 
 | `1:4` | | Tall strips, infographic panels |
 | `1:8` | | Extreme vertical banners |
 
-Note: `1:4`/`4:1`/`1:8`/`8:1` are NB2-only. NB2 Pro supports the standard 10. GPT Image 2 and GPT-5 Image / Mini support only `1:1`, `2:3`, `3:2` (mapped to 1024×1024 / 1024×1536 / 1536×1024). slika surfaces capability mismatches as `CAPABILITY_UNSUPPORTED` errors before any HTTP call.
+Note: `1:4`/`4:1`/`1:8`/`8:1` are NB2-only. NB2 Pro supports the standard 10. GPT Image 2 and GPT-5 Image / Mini support only `1:1`, `2:3`, `3:2` (mapped to 1024×1024 / 1024×1536 / 1536×1024). nanaban surfaces capability mismatches as `CAPABILITY_UNSUPPORTED` errors before any HTTP call.
 
 ## Reference Images
 
 Pass any image as a style or content reference with `-r`:
 
 ```bash
-slika "portrait of a woman" -r painting_style.png
-slika "modern living room" -r color_palette.jpg
-slika "product shot" -r brand_reference.png
+nanaban "portrait of a woman" -r painting_style.png
+nanaban "modern living room" -r color_palette.jpg
+nanaban "product shot" -r brand_reference.png
 ```
 
 The model picks up on the visual language of your reference — color palette, composition, texture, artistic style — and applies it to your prompt. Useful for keeping a consistent look across a batch of images, matching brand aesthetics, or steering output toward a specific vibe without writing a 200-word prompt.
@@ -243,9 +243,9 @@ The model picks up on the visual language of your reference — color palette, c
 ## Editing Existing Images
 
 ```bash
-slika edit photo.png "remove the background"
-slika edit headshot.png "make it a pencil sketch"
-slika edit product.png "place on a marble table" --ar wide
+nanaban edit photo.png "remove the background"
+nanaban edit headshot.png "make it a pencil sketch"
+nanaban edit product.png "place on a marble table" --ar wide
 ```
 
 Takes a source image and your edit instruction. Same flags apply — pick a model, change aspect ratio, resolution, or use Pro for finer edits.
@@ -255,7 +255,7 @@ Takes a source image and your edit instruction. Same flags apply — pick a mode
 `--json` gives machine-readable output. No spinners, no colors, no ambiguity:
 
 ```bash
-slika "a red circle" --json
+nanaban "a red circle" --json
 ```
 
 ```json
@@ -280,7 +280,7 @@ Errors come back in the same shape, with a `hint` the agent can act on:
   "status": "error",
   "code": "AUTH_MISSING",
   "message": "No authentication configured. GPT Image 2 needs one of Codex OAuth (run `codex login`).",
-  "hint": "pick one: `codex login` (free gpt-image-2 via ChatGPT Plus/Pro) | `slika auth set-openrouter <key>` | set GEMINI_API_KEY / OPENROUTER_API_KEY."
+  "hint": "pick one: `codex login` (free gpt-image-2 via ChatGPT Plus/Pro) | `nanaban auth set-openrouter <key>` | set GEMINI_API_KEY / OPENROUTER_API_KEY."
 }
 ```
 
@@ -301,28 +301,28 @@ Error codes: `AUTH_MISSING`, `AUTH_INVALID`, `AUTH_EXPIRED`, `PROMPT_MISSING`, `
 
 Exit codes: `0` success, `1` runtime error, `2` usage error.
 
-Discover everything machine-readably: `slika agent-info`.
+Discover everything machine-readably: `nanaban agent-info`.
 
 ### Piping
 
 stdout is always just the file path. Metadata goes to stderr. These compose naturally:
 
 ```bash
-slika "a cat" | xargs open                               # generate and open
-slika "a cat" 2>/dev/null | pbcopy                       # copy path to clipboard
-cat prompts.txt | while read p; do slika "$p"; done      # batch generate
+nanaban "a cat" | xargs open                               # generate and open
+nanaban "a cat" 2>/dev/null | pbcopy                       # copy path to clipboard
+cat prompts.txt | while read p; do nanaban "$p"; done      # batch generate
 ```
 
 ### Skill install for Claude / Codex / Gemini
 
-slika ships a tiny skill file so Claude Code, Codex, and Gemini know when to invoke it:
+nanaban ships a tiny skill file so Claude Code, Codex, and Gemini know when to invoke it:
 
 ```bash
-slika skill install   # writes ~/.claude/skills/slika/SKILL.md and peers
-slika skill status    # shows where it's installed
+nanaban skill install   # writes ~/.claude/skills/nanaban/SKILL.md and peers
+nanaban skill status    # shows where it's installed
 ```
 
-The skill description is intentionally terse — the full capability surface lives in `slika agent-info`, which the agent queries on demand. This keeps the skill stable across slika versions.
+The skill description is intentionally terse — the full capability surface lives in `nanaban agent-info`, which the agent queries on demand. This keeps the skill stable across nanaban versions.
 
 ## Auto-naming
 
@@ -346,16 +346,6 @@ Deliberately small:
 - OpenRouter, OpenAI Codex bridge — plain `fetch`, no SDK
 - Standalone binaries bundle everything via `bun build --compile`
 
-## Formerly nanaban
-
-slika was published as **nanaban** through v4.x. The old name kept getting confused with Google's *Nano Banana* models — which are just one of the families this CLI routes — so the tool is now **slika** (Serbian for "image"). Migration is automatic:
-
-- The `nanaban` command still works — it ships as a bin alias of `slika`.
-- Config is read from `~/.nanaban/config.json` as a fallback; writes migrate to `~/.slika/config.json`.
-- Legacy `NANABAN_*` env vars are still honored (new names: `SLIKA_*`).
-- `slika skill install` replaces any old nanaban agent-skill files.
-- Old GitHub URLs redirect (the repo was renamed in place).
-
 ## Contributing
 
 Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
@@ -371,7 +361,7 @@ Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 </p>
 
 <p align="center">
-  <a href="https://github.com/paperfoot/slika/stargazers"><img src="https://img.shields.io/github/stars/paperfoot/slika?style=for-the-badge&logo=github&label=%E2%AD%90%20Star%20this%20repo&color=yellow" alt="Star this repo"></a>
+  <a href="https://github.com/paperfoot/nanaban-cli/stargazers"><img src="https://img.shields.io/github/stars/paperfoot/nanaban?style=for-the-badge&logo=github&label=%E2%AD%90%20Star%20this%20repo&color=yellow" alt="Star this repo"></a>
   &nbsp;
   <a href="https://x.com/longevityboris"><img src="https://img.shields.io/badge/Follow_%40longevityboris-000000?style=for-the-badge&logo=x&logoColor=white" alt="Follow @longevityboris on X"></a>
 </p>

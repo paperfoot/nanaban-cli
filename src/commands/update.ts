@@ -1,6 +1,6 @@
 import { VERSION } from '../version.js';
 
-const LATEST_RELEASE_URL = 'https://api.github.com/repos/paperfoot/slika/releases/latest';
+const LATEST_RELEASE_URL = 'https://api.github.com/repos/paperfoot/nanaban-cli/releases/latest';
 
 export type InstallChannel = 'homebrew' | 'npm' | 'standalone';
 
@@ -17,12 +17,12 @@ export function detectChannel(): InstallChannel {
 }
 
 function upgradeCommand(channel: InstallChannel, latest: string): string {
-  if (channel === 'homebrew') return 'brew update && brew upgrade paperfoot/tap/slika';
-  if (channel === 'npm') return 'npm install -g slika@latest';
+  if (channel === 'homebrew') return 'brew update && brew upgrade paperfoot/tap/nanaban';
+  if (channel === 'npm') return 'npm install -g nanaban@latest';
   const platform = process.platform === 'darwin' ? 'darwin' : process.platform === 'win32' ? 'windows' : 'linux';
   const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
   const ext = platform === 'windows' ? '.exe' : '';
-  return `curl -fsSL -o "${process.execPath}" https://github.com/paperfoot/slika/releases/download/v${latest}/slika-${platform}-${arch}${ext} && chmod +x "${process.execPath}"`;
+  return `curl -fsSL -o "${process.execPath}" https://github.com/paperfoot/nanaban-cli/releases/download/v${latest}/nanaban-${platform}-${arch}${ext} && chmod +x "${process.execPath}"`;
 }
 
 function cmpSemver(a: string, b: string): number {
@@ -50,7 +50,7 @@ export async function runUpdate(json: boolean): Promise<void> {
         status: 'error',
         code: 'NETWORK_ERROR',
         message: `Could not check latest release: ${err.message}`,
-        hint: 'Retry, or check https://github.com/paperfoot/slika/releases manually.',
+        hint: 'Retry, or check https://github.com/paperfoot/nanaban-cli/releases manually.',
       }) + '\n');
     } else {
       process.stderr.write(`Error: could not check latest release: ${err.message}\n`);
@@ -74,8 +74,8 @@ export async function runUpdate(json: boolean): Promise<void> {
   }
 
   if (!updateAvailable) {
-    process.stderr.write(`slika ${VERSION} is up to date (latest: ${latest}).\n`);
+    process.stderr.write(`nanaban ${VERSION} is up to date (latest: ${latest}).\n`);
     return;
   }
-  process.stderr.write(`slika ${VERSION} → ${latest} available (install channel: ${channel}).\nRun:\n  ${command}\n`);
+  process.stderr.write(`nanaban ${VERSION} → ${latest} available (install channel: ${channel}).\nRun:\n  ${command}\n`);
 }

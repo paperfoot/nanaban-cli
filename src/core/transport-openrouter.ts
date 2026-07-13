@@ -71,8 +71,8 @@ export async function generateViaOpenRouter(
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://github.com/paperfoot/slika',
-        'X-Title': 'slika',
+        'HTTP-Referer': 'https://github.com/paperfoot/nanaban',
+        'X-Title': 'nanaban',
       },
       body: JSON.stringify(body),
     });

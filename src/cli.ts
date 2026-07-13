@@ -12,7 +12,7 @@ const program = new Command();
 const ratiosHelp = '1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9, 1:4, 4:1, 1:8, 8:1 (aliases: square, wide, tall, ultrawide, panoramic, banner, portrait, story)';
 
 program
-  .name('slika')
+  .name('nanaban')
   .description('Image generation from the terminal — Nano Banana (Gemini) and GPT Image via one CLI')
   .version(VERSION, '-v, --version')
   .enablePositionalOptions()
@@ -64,7 +64,7 @@ const authCmd = new Command('auth')
 
 authCmd
   .command('set <key>')
-  .description('store Gemini API key in ~/.slika/config.json')
+  .description('store Gemini API key in ~/.nanaban/config.json')
   .option('--json', 'JSON output', false)
   .action(async (key: string, opts) => {
     await runAuthSet(key, opts.json);
@@ -72,7 +72,7 @@ authCmd
 
 authCmd
   .command('set-openrouter <key>')
-  .description('store OpenRouter key in ~/.slika/config.json')
+  .description('store OpenRouter key in ~/.nanaban/config.json')
   .option('--json', 'JSON output', false)
   .action(async (key: string, opts) => {
     await runAuthSetOpenRouter(key, opts.json);

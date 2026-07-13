@@ -33,8 +33,8 @@ export interface AuthState {
 
 async function getOAuthClient(): Promise<OAuth2Client | null> {
   const config = await readConfig();
-  const clientId = process.env.SLIKA_OAUTH_CLIENT_ID || process.env.NANABAN_OAUTH_CLIENT_ID || config.oauthClientId;
-  const clientSecret = process.env.SLIKA_OAUTH_CLIENT_SECRET || process.env.NANABAN_OAUTH_CLIENT_SECRET || config.oauthClientSecret;
+  const clientId = process.env.NANABAN_OAUTH_CLIENT_ID || config.oauthClientId;
+  const clientSecret = process.env.NANABAN_OAUTH_CLIENT_SECRET || config.oauthClientSecret;
   if (!clientId || !clientSecret) return null;
 
   const oauthPath = path.join(homedir(), '.gemini', 'oauth_creds.json');

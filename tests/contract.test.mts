@@ -32,7 +32,7 @@ describe('agent-info', () => {
     const { stdout, exitCode } = run(['agent-info']);
     assert.equal(exitCode, 0, 'agent-info should exit 0');
     const manifest = JSON.parse(stdout);
-    assert.equal(manifest.name, 'slika');
+    assert.equal(manifest.name, 'nanaban');
     assert.ok(manifest.version);
   });
 
@@ -147,7 +147,7 @@ describe('agent-info', () => {
   it('declares config path and format', () => {
     const { stdout } = run(['agent-info']);
     const manifest = JSON.parse(stdout);
-    assert.equal(manifest.config.path, '~/.slika/config.json');
+    assert.equal(manifest.config.path, '~/.nanaban/config.json');
     assert.equal(manifest.config.format, 'json');
   });
 });

@@ -29,10 +29,10 @@ jobs:
           TAG="${GITHUB_REF_NAME#v}"
           PKG=$(node -p "require('./package.json').version")
           SRC=$(grep -oE "'[0-9]+\.[0-9]+\.[0-9]+'" src/version.ts | head -1 | tr -d "'")
-          BREW=$(grep -oE 'version "[0-9]+\.[0-9]+\.[0-9]+"' Formula/slika.rb | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          BREW=$(grep -oE 'version "[0-9]+\.[0-9]+\.[0-9]+"' Formula/nanaban.rb | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
           echo "tag=$TAG package=$PKG src=$SRC brew=$BREW"
           if [[ "$TAG" != "$PKG" ]] || [[ "$TAG" != "$SRC" ]] || [[ "$TAG" != "$BREW" ]]; then
-            echo "::error::version mismatch: tag=$TAG package.json=$PKG src/version.ts=$SRC Formula/slika.rb=$BREW"
+            echo "::error::version mismatch: tag=$TAG package.json=$PKG src/version.ts=$SRC Formula/nanaban.rb=$BREW"
             echo "::error::run ./scripts/bump-version.sh $TAG locally, commit, re-tag, and re-push."
             exit 1
           fi
@@ -49,56 +49,56 @@ jobs:
       - name: Compute Homebrew formula stanza
         id: brew
         run: |
-          ARM=$(shasum -a 256 dist/slika-darwin-arm64 | awk '{print $1}')
-          MAC=$(shasum -a 256 dist/slika-darwin-x64   | awk '{print $1}')
-          LINX=$(shasum -a 256 dist/slika-linux-x64   | awk '{print $1}')
-          LINA=$(shasum -a 256 dist/slika-linux-arm64 | awk '{print $1}')
+          ARM=$(shasum -a 256 dist/nanaban-darwin-arm64 | awk '{print $1}')
+          MAC=$(shasum -a 256 dist/nanaban-darwin-x64   | awk '{print $1}')
+          LINX=$(shasum -a 256 dist/nanaban-linux-x64   | awk '{print $1}')
+          LINA=$(shasum -a 256 dist/nanaban-linux-arm64 | awk '{print $1}')
           VER="${GITHUB_REF_NAME#v}"
           {
-            echo 'class Slika < Formula'
+            echo 'class Nanaban < Formula'
             echo '  desc "Image generation from the terminal (GPT Image 2, Nano Banana, GPT-5 Image)"'
-            echo '  homepage "https://github.com/paperfoot/slika"'
+            echo '  homepage "https://github.com/paperfoot/nanaban"'
             echo "  version \"$VER\""
             echo '  license "MIT"'
             echo
             echo '  on_macos do'
             echo '    if Hardware::CPU.arm?'
-            echo "      url \"https://github.com/paperfoot/slika/releases/download/v$VER/slika-darwin-arm64\""
+            echo "      url \"https://github.com/paperfoot/nanaban-cli/releases/download/v$VER/nanaban-darwin-arm64\""
             echo "      sha256 \"$ARM\""
             echo '    else'
-            echo "      url \"https://github.com/paperfoot/slika/releases/download/v$VER/slika-darwin-x64\""
+            echo "      url \"https://github.com/paperfoot/nanaban-cli/releases/download/v$VER/nanaban-darwin-x64\""
             echo "      sha256 \"$MAC\""
             echo '    end'
             echo '  end'
             echo
             echo '  on_linux do'
             echo '    if Hardware::CPU.arm?'
-            echo "      url \"https://github.com/paperfoot/slika/releases/download/v$VER/slika-linux-arm64\""
+            echo "      url \"https://github.com/paperfoot/nanaban-cli/releases/download/v$VER/nanaban-linux-arm64\""
             echo "      sha256 \"$LINA\""
             echo '    else'
-            echo "      url \"https://github.com/paperfoot/slika/releases/download/v$VER/slika-linux-x64\""
+            echo "      url \"https://github.com/paperfoot/nanaban-cli/releases/download/v$VER/nanaban-linux-x64\""
             echo "      sha256 \"$LINX\""
             echo '    end'
             echo '  end'
             echo
             echo '  def install'
-            echo '    bin_name = OS.mac? ? (Hardware::CPU.arm? ? "slika-darwin-arm64" : "slika-darwin-x64")'
-            echo '                       : (Hardware::CPU.arm? ? "slika-linux-arm64"  : "slika-linux-x64")'
-            echo '    bin.install bin_name => "slika"'
+            echo '    bin_name = OS.mac? ? (Hardware::CPU.arm? ? "nanaban-darwin-arm64" : "nanaban-darwin-x64")'
+            echo '                       : (Hardware::CPU.arm? ? "nanaban-linux-arm64"  : "nanaban-linux-x64")'
+            echo '    bin.install bin_name => "nanaban"'
             echo '  end'
             echo
             echo '  test do'
-            echo '    assert_match version.to_s, shell_output("#{bin}/slika --version")'
+            echo '    assert_match version.to_s, shell_output("#{bin}/nanaban --version")'
             echo '  end'
             echo 'end'
-          } > dist/slika.rb
+          } > dist/nanaban.rb
           {
             echo '## Homebrew formula for this release'
             echo
-            echo 'Copy `dist/slika.rb` into the `Formula/` directory of `paperfoot/homebrew-tap` and commit.'
+            echo 'Copy `dist/nanaban.rb` into the `Formula/` directory of `paperfoot/homebrew-tap` and commit.'
             echo
             echo '```ruby'
-            cat dist/slika.rb
+            cat dist/nanaban.rb
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -106,12 +106,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/slika-darwin-arm64
-            dist/slika-darwin-x64
-            dist/slika-linux-x64
-            dist/slika-linux-arm64
-            dist/slika-windows-x64.exe
+            dist/nanaban-darwin-arm64
+            dist/nanaban-darwin-x64
+            dist/nanaban-linux-x64
+            dist/nanaban-linux-arm64
+            dist/nanaban-windows-x64.exe
             dist/SHA256SUMS.txt
-            dist/slika.rb
+            dist/nanaban.rb
           generate_release_notes: true
           fail_on_unmatched_files: true
