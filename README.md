@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="nanaban_logo.png" alt="slika — image generation from the terminal" width="600">
+  <img src="slika_logo.png" alt="slika — image generation from the terminal" width="600">
 </p>
 
 <h1 align="center">slika</h1>
