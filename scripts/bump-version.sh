@@ -51,8 +51,13 @@ node -e "
   fs.writeFileSync('Formula/nanaban.rb', t);
 "
 
+# package-lock.json — keep the lockfile's root version in sync (it sat at a
+# five-releases-stale version because nothing regenerated it).
+npm install --package-lock-only --ignore-scripts >/dev/null
+
 echo "Bumped to $NEW across:"
 echo "  - package.json"
+echo "  - package-lock.json"
 echo "  - src/version.ts"
 echo "  - Formula/nanaban.rb"
 echo

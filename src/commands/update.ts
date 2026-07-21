@@ -8,21 +8,30 @@ export type InstallChannel = 'homebrew' | 'npm' | 'standalone';
 // must defer to the package manager — we detect the channel and return the
 // exact tested upgrade command instead of self-replacing.
 export function detectChannel(): InstallChannel {
-  const exec = process.execPath;
-  if (exec.includes('/Cellar/') || exec.includes('/linuxbrew/')) return 'homebrew';
-  // Compiled bun binaries run from the embedded interpreter; a node-hosted
-  // process means we were launched through the npm bin shim.
-  if (!(process as any).isBun && !process.versions.bun) return 'npm';
-  return 'standalone';
+  // Only compiled bun binaries can be homebrew/standalone installs. A
+  // node-hosted process is ALWAYS the npm bin shim — checking execPath for
+  // '/Cellar/' first misclassified every npm install running under a
+  // homebrew-installed node (the common macOS setup) as 'homebrew'.
+  if ((process as any).isBun || process.versions.bun) {
+    const exec = process.execPath;
+    if (exec.includes('/Cellar/') || exec.includes('/linuxbrew/')) return 'homebrew';
+    return 'standalone';
+  }
+  return 'npm';
 }
 
 function upgradeCommand(channel: InstallChannel, latest: string): string {
   if (channel === 'homebrew') return 'brew update && brew upgrade paperfoot/tap/nanaban';
   if (channel === 'npm') return 'npm install -g nanaban@latest';
-  const platform = process.platform === 'darwin' ? 'darwin' : process.platform === 'win32' ? 'windows' : 'linux';
+  if (process.platform === 'win32') {
+    return `download nanaban-windows-x64.exe from https://github.com/paperfoot/nanaban-cli/releases/tag/v${latest} and replace ${process.execPath}`;
+  }
+  const platform = process.platform === 'darwin' ? 'darwin' : 'linux';
   const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
-  const ext = platform === 'windows' ? '.exe' : '';
-  return `curl -fsSL -o "${process.execPath}" https://github.com/paperfoot/nanaban-cli/releases/download/v${latest}/nanaban-${platform}-${arch}${ext} && chmod +x "${process.execPath}"`;
+  const url = `https://github.com/paperfoot/nanaban-cli/releases/download/v${latest}/nanaban-${platform}-${arch}`;
+  // Download to a temp file and move atomically — never truncate the running
+  // binary in place. SHA256SUMS.txt ships alongside every release.
+  return `curl -fsSL -o /tmp/nanaban-${latest} ${url} && chmod +x /tmp/nanaban-${latest} && mv /tmp/nanaban-${latest} "${process.execPath}"`;
 }
 
 function cmpSemver(a: string, b: string): number {

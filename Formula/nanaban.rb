@@ -10,7 +10,7 @@
 #   brew install paperfoot/tap/nanaban
 #
 # Or, for a one-off install without a tap:
-#   brew install --cask <url-to-a-generated-nanaban.rb>
+#   curl -fsSLO <url-to-a-generated-nanaban.rb> && brew install ./nanaban.rb
 #
 # The SHA256 placeholders below are intentionally left as-is so a wrong paste
 # fails loudly (brew refuses formulae whose sha256 doesn't match).

@@ -38,10 +38,26 @@ jobs:
           fi
 
       - name: Install npm deps (for `npm test`)
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Run tests
         run: npm test
+
+      - name: Smoke-test the packed npm tarball in a clean prefix
+        run: |
+          set -euo pipefail
+          npm pack
+          TARBALL=$(ls nanaban-*.tgz)
+          PREFIX=$(mktemp -d)
+          npm install -g --prefix "$PREFIX" "./$TARBALL"
+          BIN="$PREFIX/bin/nanaban"
+          test "$("$BIN" --version)" = "${GITHUB_REF_NAME#v}"
+          "$BIN" agent-info | node -e "JSON.parse(require('fs').readFileSync(0,'utf8'))"
+          set +e
+          OUT=$("$BIN" --json 2>/dev/null); CODE=$?
+          set -e
+          test "$CODE" -eq 3
+          echo "$OUT" | node -e "const e=JSON.parse(require('fs').readFileSync(0,'utf8')); if(e.code!=='PROMPT_MISSING')process.exit(1)"
 
       - name: Build cross-platform binaries
         run: ./scripts/build-binaries.sh
@@ -57,7 +73,7 @@ jobs:
           {
             echo 'class Nanaban < Formula'
             echo '  desc "Image generation from the terminal (GPT Image 2, Nano Banana, GPT-5 Image)"'
-            echo '  homepage "https://github.com/paperfoot/nanaban"'
+            echo '  homepage "https://github.com/paperfoot/nanaban-cli"'
             echo "  version \"$VER\""
             echo '  license "MIT"'
             echo
