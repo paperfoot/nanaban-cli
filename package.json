@@ -1,8 +1,8 @@
 {
   "name": "nanaban",
-  "version": "5.0.1",
+  "version": "5.1.0",
   "type": "module",
-  "description": "Image generation from the terminal \u2014 GPT Image 2 (free on ChatGPT Plus/Pro via Codex OAuth), Nano Banana 2/Lite/Pro (Gemini), and GPT-5.x Image, routed through one CLI.",
+  "description": "Image generation from the terminal — GPT Image 2 (free on ChatGPT Plus/Pro via Codex OAuth), Nano Banana 2/Lite/Pro (Gemini), and GPT-5.x Image, routed through one CLI.",
   "bin": {
     "nanaban": "./bin/nanaban.mjs"
   },
