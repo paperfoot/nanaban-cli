@@ -1,13 +1,15 @@
-import { access, writeFile, mkdir } from 'fs/promises';
+import { access } from 'fs/promises';
 import path from 'path';
 import { dispatch } from '../core/dispatch.js';
-import { autoName } from '../lib/naming.js';
+import { saveImage } from '../lib/save.js';
 import { createOutput, type Output } from '../lib/output.js';
 import { normalizeError, NB2Error } from '../lib/errors.js';
+import { reportSuccess, openInViewer } from './generate.js';
 
 export interface EditCommandOpts {
   output?: string;
-  ar: string;
+  /** No default: undefined means "match the source image's aspect ratio". */
+  ar?: string;
   size: string;
   pro: boolean;
   model?: string;
@@ -21,19 +23,14 @@ export interface EditCommandOpts {
 export async function runEdit(imagePath: string, prompt: string, opts: EditCommandOpts): Promise<void> {
   const out: Output = createOutput(opts.json, opts.quiet);
 
-  if (!imagePath || !prompt) {
-    const err = new NB2Error('PROMPT_MISSING', 'Usage: nanaban edit <image> "edit instructions"');
-    out.error(err);
-    process.exit(err.exitCode);
-  }
-
   const resolved = path.resolve(imagePath);
   try {
     await access(resolved);
   } catch {
     const err = new NB2Error('IMAGE_NOT_FOUND', `Image not found: ${resolved}`);
     out.error(err);
-    process.exit(err.exitCode);
+    process.exitCode = err.exitCode;
+    return;
   }
 
   try {
@@ -54,33 +51,18 @@ export async function runEdit(imagePath: string, prompt: string, opts: EditComma
 
     out.info(`Auth: ${result.authMethod}`);
 
-    const dir = process.cwd();
-    const filename = opts.output || await autoName(prompt, dir);
-    const filePath = path.resolve(dir, filename);
-    await mkdir(path.dirname(filePath), { recursive: true });
-    await writeFile(filePath, result.buffer);
-
-    out.stopSpin();
-    out.success({
-      file: filePath,
-      model: result.modelId,
-      transport: result.transport,
-      width: result.width,
-      height: result.height,
-      sizeBytes: result.buffer.length,
-      durationMs: result.durationMs,
-      costUsd: result.costUsd,
-      fallbacks: result.fallbacks,
+    const filePath = await saveImage(result.buffer, {
+      outputPath: opts.output,
+      prompt,
+      mimeType: result.mimeType,
     });
 
-    if (opts.open) {
-      const { execFile } = await import('child_process');
-      execFile('open', [filePath]);
-    }
+    await reportSuccess(out, result, filePath);
+    if (opts.open) await openInViewer(filePath);
   } catch (err) {
     out.stopSpin();
     const nerr = normalizeError(err);
     out.error(nerr);
-    process.exit(nerr.exitCode);
+    process.exitCode = nerr.exitCode;
   }
 }

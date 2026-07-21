@@ -23,6 +23,20 @@ export interface CodexSource {
   accessToken: string;
   accountId: string;
   path: string;
+  /** True when the JWT's exp is in the past — the file exists but the token is stale. */
+  expired: boolean;
+}
+
+// ChatGPT access tokens are JWTs; a decodable past `exp` means `codex login`
+// is needed. An undecodable token is treated as live (fail open — the request
+// itself will classify it properly).
+export function jwtExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf-8'));
+    return typeof payload.exp === 'number' && payload.exp * 1000 < Date.now();
+  } catch {
+    return false;
+  }
 }
 
 export interface AuthState {
@@ -97,6 +111,7 @@ export async function detectAuth(): Promise<AuthState> {
         accessToken,
         accountId,
         path: '~/.codex/auth.json',
+        expired: jwtExpired(accessToken),
       };
     }
   } catch {

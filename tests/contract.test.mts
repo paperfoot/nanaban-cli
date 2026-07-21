@@ -181,9 +181,53 @@ describe('version and help', () => {
 });
 
 describe('exit codes', () => {
-  it('no prompt shows help and exits 0', () => {
-    const { exitCode } = run([]);
+  it('no prompt is PROMPT_MISSING: exit 3, help on stderr, empty stdout', () => {
+    const { stdout, stderr, exitCode } = run([]);
+    assert.equal(exitCode, 3);
+    assert.equal(stdout, '', 'stdout is reserved for the file path / JSON envelope');
+    assert.match(stderr, /Usage: nanaban/);
+  });
+
+  it('no prompt with --json emits the PROMPT_MISSING envelope on stdout, exit 3', () => {
+    const { stdout, exitCode } = run(['--json']);
+    assert.equal(exitCode, 3);
+    const envelope = JSON.parse(stdout);
+    assert.equal(envelope.status, 'error');
+    assert.equal(envelope.code, 'PROMPT_MISSING');
+    assert.ok(envelope.hint, 'every error envelope carries a hint');
+  });
+
+  it('unknown option with --json is BAD_ARGUMENT: exit 3 with envelope', () => {
+    const { stdout, exitCode } = run(['hello', '--definitely-not-a-flag', '--json']);
+    assert.equal(exitCode, 3);
+    const envelope = JSON.parse(stdout);
+    assert.equal(envelope.status, 'error');
+    assert.equal(envelope.code, 'BAD_ARGUMENT');
+  });
+
+  it('missing edit arguments exit 3, not 1 (1 means "transient — retry")', () => {
+    const { exitCode } = run(['edit', 'photo.png', '--json']);
+    assert.equal(exitCode, 3);
+  });
+
+  it('agent-info accepts --json (agents append it habitually)', () => {
+    const { stdout, exitCode } = run(['agent-info', '--json']);
     assert.equal(exitCode, 0);
+    JSON.parse(stdout);
+  });
+
+  it('missing -r reference file is IMAGE_NOT_FOUND exit 3, not GENERATION_FAILED exit 1', () => {
+    const { stdout, exitCode } = run(['a red apple', '-r', '/definitely/not/a/file_xyz.png', '--json']);
+    assert.equal(exitCode, 3);
+    const envelope = JSON.parse(stdout);
+    assert.equal(envelope.code, 'IMAGE_NOT_FOUND');
+  });
+
+  it('upscale of a missing file is IMAGE_NOT_FOUND exit 3', () => {
+    const { stdout, exitCode } = run(['upscale', '/definitely/not/a/file_xyz.png', '--json']);
+    assert.equal(exitCode, 3);
+    const envelope = JSON.parse(stdout);
+    assert.equal(envelope.code, 'IMAGE_NOT_FOUND');
   });
 });
 

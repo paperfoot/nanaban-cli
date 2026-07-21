@@ -1,13 +1,11 @@
-import path from 'path';
-import { writeFile, mkdir } from 'fs/promises';
-import { dispatch } from '../core/dispatch.js';
-import { autoName } from '../lib/naming.js';
+import { dispatch, type DispatchResult } from '../core/dispatch.js';
+import { saveImage } from '../lib/save.js';
 import { createOutput, type Output } from '../lib/output.js';
-import { normalizeError, NB2Error } from '../lib/errors.js';
+import { normalizeError } from '../lib/errors.js';
 
 export interface GenerateCommandOpts {
   output?: string;
-  ar: string;
+  ar?: string;
   size: string;
   pro: boolean;
   model?: string;
@@ -19,14 +17,37 @@ export interface GenerateCommandOpts {
   quiet: boolean;
 }
 
+export async function openInViewer(filePath: string): Promise<void> {
+  const { execFile } = await import('child_process');
+  const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+  execFile(opener, [filePath], () => { /* best-effort; never crash after a successful save */ });
+}
+
+export async function reportSuccess(
+  out: Output,
+  result: DispatchResult,
+  filePath: string,
+  extra?: { operation?: string; method?: string; engine?: string; contentPreservation?: string; scale?: number; warnings?: string[] },
+): Promise<void> {
+  out.stopSpin();
+  out.success({
+    file: filePath,
+    model: result.model.id,
+    providerModel: result.modelId,
+    transport: result.transport,
+    mimeType: result.mimeType,
+    width: result.width,
+    height: result.height,
+    sizeBytes: result.buffer.length,
+    durationMs: result.durationMs,
+    costUsd: result.costUsd,
+    fallbacks: result.fallbacks,
+    ...extra,
+  });
+}
+
 export async function runGenerate(prompt: string, opts: GenerateCommandOpts): Promise<void> {
   const out: Output = createOutput(opts.json, opts.quiet);
-
-  if (!prompt) {
-    const err = new NB2Error('PROMPT_MISSING', 'No prompt provided. Usage: nanaban "your prompt"');
-    out.error(err);
-    process.exit(err.exitCode);
-  }
 
   try {
     out.spin('Generating image...');
@@ -46,33 +67,18 @@ export async function runGenerate(prompt: string, opts: GenerateCommandOpts): Pr
 
     out.info(`Auth: ${result.authMethod}`);
 
-    const dir = process.cwd();
-    const filename = opts.output || await autoName(prompt, dir);
-    const filePath = path.resolve(dir, filename);
-    await mkdir(path.dirname(filePath), { recursive: true });
-    await writeFile(filePath, result.buffer);
-
-    out.stopSpin();
-    out.success({
-      file: filePath,
-      model: result.modelId,
-      transport: result.transport,
-      width: result.width,
-      height: result.height,
-      sizeBytes: result.buffer.length,
-      durationMs: result.durationMs,
-      costUsd: result.costUsd,
-      fallbacks: result.fallbacks,
+    const filePath = await saveImage(result.buffer, {
+      outputPath: opts.output,
+      prompt,
+      mimeType: result.mimeType,
     });
 
-    if (opts.open) {
-      const { execFile } = await import('child_process');
-      execFile('open', [filePath]);
-    }
+    await reportSuccess(out, result, filePath);
+    if (opts.open) await openInViewer(filePath);
   } catch (err) {
     out.stopSpin();
     const nerr = normalizeError(err);
     out.error(nerr);
-    process.exit(nerr.exitCode);
+    process.exitCode = nerr.exitCode;
   }
 }

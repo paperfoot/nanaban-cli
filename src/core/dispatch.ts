@@ -11,9 +11,12 @@ import { resolveModel, type ModelInfo, type TransportId } from './models.js';
 import { generateViaGemini } from './transport-gemini.js';
 import { generateViaOpenRouter } from './transport-openrouter.js';
 import { generateViaCodexOAuth } from './transport-codex-oauth.js';
+import path from 'path';
+import fs from 'fs/promises';
 import { parseAspectRatio, parseImageSize, checkCapabilities } from './aspect.js';
 import { NB2Error, normalizeError, isTransient } from '../lib/errors.js';
-import type { ImageRequest, ImageResult, GenerationMode } from './types.js';
+import { inspectImage } from '../lib/image-meta.js';
+import type { ImageRequest, ImageResult, GenerationMode, AspectRatio, ImageSize } from './types.js';
 import type { ReferenceImage } from './reference.js';
 
 export interface DispatchOptions {
@@ -35,7 +38,12 @@ export interface DispatchResult extends ImageResult {
   fallbacks?: { transport: TransportId; code: string; message: string }[];
 }
 
-function pickModel(opts: DispatchOptions, auth: AuthState): ModelInfo {
+function pickModel(
+  opts: DispatchOptions,
+  auth: AuthState,
+  aspect: AspectRatio | undefined,
+  size: ImageSize | undefined,
+): ModelInfo {
   let name = opts.modelName;
   if (!name) {
     // Only auto-select gpt-image-2 when the user hasn't pinned a non-Codex transport.
@@ -49,10 +57,18 @@ function pickModel(opts: DispatchOptions, auth: AuthState): ModelInfo {
 
     if (opts.pro) {
       name = 'nb2-pro';
-    } else if (auth.codex && !viaForcesNonCodex) {
-      name = 'gpt-image-2';
     } else {
-      name = 'nb2';
+      // Implicit selection must satisfy what was actually asked for: a machine
+      // with Codex auth used to auto-pick gpt-image-2 and then fail every
+      // `--ar wide` / `--size 2k` request with CAPABILITY_UNSUPPORTED. A stale
+      // Codex token similarly used to hijack the default onto a route that can
+      // only fail with AUTH_EXPIRED.
+      const gi2 = resolveModel('gpt-image-2')!;
+      const gi2Fits =
+        (!aspect || gi2.caps.aspectRatios.includes(aspect)) &&
+        (!size || gi2.caps.sizes.includes(size));
+      const codexUsable = auth.codex && !auth.codex.expired && !viaForcesNonCodex;
+      name = codexUsable && gi2Fits ? 'gpt-image-2' : 'nb2';
     }
   }
 
@@ -61,6 +77,35 @@ function pickModel(opts: DispatchOptions, auth: AuthState): ModelInfo {
     throw new NB2Error('MODEL_NOT_FOUND', `Unknown model "${name}". Run \`nanaban agent-info\` to list available models.`);
   }
   return model;
+}
+
+// For `edit` with no explicit --ar: match the source image instead of silently
+// forcing 1:1 (which cropped every non-square input to a square).
+async function inferSourceAspect(
+  ref: ReferenceImage,
+  model: ModelInfo,
+  basePath?: string,
+): Promise<AspectRatio | null> {
+  if (ref.source !== 'file' || !ref.path) return null;
+  try {
+    const filePath = basePath ? path.resolve(basePath, ref.path) : path.resolve(ref.path);
+    const meta = inspectImage(await fs.readFile(filePath));
+    if (!meta.width || !meta.height) return null;
+    const actual = meta.width / meta.height;
+    let best: AspectRatio | null = null;
+    let bestDist = Infinity;
+    for (const r of model.caps.aspectRatios) {
+      const [rw, rh] = r.split(':').map(Number);
+      const dist = Math.abs(Math.log(actual / (rw / rh)));
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = r;
+      }
+    }
+    return best;
+  } catch {
+    return null;
+  }
 }
 
 function parseTransport(via: string | undefined): TransportId | undefined {
@@ -124,9 +169,15 @@ async function runRoute(
 
 export async function dispatch(opts: DispatchOptions): Promise<DispatchResult> {
   const auth = await detectAuth();
-  const model = pickModel(opts, auth);
-  const aspectRatio = parseAspectRatio(opts.aspect || '1:1');
+  const requestedAspect = opts.aspect ? parseAspectRatio(opts.aspect) : undefined;
   const imageSize = parseImageSize(opts.size || '1K');
+  const model = pickModel(opts, auth, requestedAspect, imageSize);
+
+  let aspectRatio = requestedAspect;
+  if (!aspectRatio && opts.mode === 'edit' && opts.referenceImages?.[0]) {
+    aspectRatio = (await inferSourceAspect(opts.referenceImages[0], model, opts.basePath)) ?? undefined;
+  }
+  aspectRatio ??= '1:1';
   checkCapabilities(model, aspectRatio, imageSize);
 
   if (opts.mode === 'edit' && !model.caps.edit) {
@@ -150,15 +201,30 @@ export async function dispatch(opts: DispatchOptions): Promise<DispatchResult> {
     referenceImages: opts.referenceImages,
   };
 
+  const expiredCodexError = () =>
+    new NB2Error(
+      'AUTH_EXPIRED',
+      `${model.display} needs the Codex bridge but the ChatGPT OAuth token in ~/.codex/auth.json is expired — ` +
+        'run `codex login` to refresh it (or pick a non-Codex model/transport).',
+    );
+
   // Explicit --via: one shot, no fallback. Caller asked for this specific route.
   if (forced) {
     const route = resolveRoute(model, auth, forced);
+    if (route.transport === 'codex-oauth' && auth.codex?.expired) throw expiredCodexError();
     const result = await runRoute(route, auth, request, opts.basePath);
     return { ...result, model, authMethod: describeAuth(route.transport, auth) };
   }
 
   // Auto routing: try preferred transport, fall back on transient failures.
-  const routes = routesForModel(model, auth);
+  // A present-but-expired Codex token is excluded up front — attempting it can
+  // only burn time on a guaranteed 401.
+  let routes = routesForModel(model, auth);
+  if (auth.codex?.expired) {
+    const hadCodex = routes.some(r => r.transport === 'codex-oauth');
+    routes = routes.filter(r => r.transport !== 'codex-oauth');
+    if (hadCodex && routes.length === 0) throw expiredCodexError();
+  }
   if (routes.length === 0) throw noRoutesError(model, auth);
 
   const fallbacks: { transport: TransportId; code: string; message: string }[] = [];

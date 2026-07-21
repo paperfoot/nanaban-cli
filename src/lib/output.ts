@@ -11,14 +11,25 @@ export interface FallbackHop {
 
 export interface GenerateResult {
   file: string;
+  /** Canonical nanaban model id (e.g. "nb2") — what the caller asked for. */
   model: string;
+  /** Provider-side model id actually invoked (e.g. "gemini-3.1-flash-image"). */
+  providerModel?: string;
   transport: string;
+  mimeType?: string;
   width: number;
   height: number;
   sizeBytes: number;
   durationMs: number;
   costUsd?: number;
   fallbacks?: FallbackHop[];
+  /** Present on upscale results. */
+  operation?: string;
+  method?: string;
+  engine?: string;
+  contentPreservation?: string;
+  scale?: number;
+  warnings?: string[];
 }
 
 export interface Output {
@@ -62,6 +73,11 @@ export class HumanOutput implements Output {
           process.stderr.write(pc.yellow(`     fell back: ${f.transport} failed with ${f.code}, retried on ${r.transport}`) + '\n');
         }
       }
+      if (r.warnings?.length) {
+        for (const w of r.warnings) {
+          process.stderr.write(pc.yellow(`     warning: ${w}`) + '\n');
+        }
+      }
     }
     process.stdout.write(r.file + '\n');
   }
@@ -102,8 +118,16 @@ export class JsonOutput implements Output {
       size_bytes: r.sizeBytes,
       duration_ms: r.durationMs,
     };
+    if (r.providerModel && r.providerModel !== r.model) out.provider_model = r.providerModel;
+    if (r.mimeType) out.mime_type = r.mimeType;
     if (r.costUsd !== undefined) out.cost_usd = r.costUsd;
     if (r.fallbacks?.length) out.fallbacks = r.fallbacks;
+    if (r.operation) out.operation = r.operation;
+    if (r.method) out.method = r.method;
+    if (r.engine) out.engine = r.engine;
+    if (r.contentPreservation) out.content_preservation = r.contentPreservation;
+    if (r.scale) out.scale = r.scale;
+    if (r.warnings?.length) out.warnings = r.warnings;
     process.stdout.write(JSON.stringify(out) + '\n');
   }
 
@@ -143,6 +167,22 @@ function hintFor(code: string): string | null {
       return 'run `nanaban agent-info` to see each model\'s supported aspect ratios, sizes, and features.';
     case 'MODEL_NOT_FOUND':
       return 'run `nanaban agent-info` for the list of valid model ids and aliases.';
+    case 'GENERATION_FAILED':
+      return 'usually a content-policy block or malformed request — rewording the prompt often resolves it. Not auto-retried on another provider (it would reject for the same reason).';
+    case 'CONTENT_BLOCKED':
+      return 'the provider\'s safety filter rejected this prompt or image. Reword the request — retrying unchanged will fail identically.';
+    case 'PROMPT_MISSING':
+      return 'pass a prompt as the first positional argument: `nanaban "your prompt"`.';
+    case 'BAD_ARGUMENT':
+      return 'run `nanaban --help` (or `nanaban agent-info` for the machine-readable flag list) and fix the invocation.';
+    case 'IMAGE_NOT_FOUND':
+      return 'verify the path passed to `nanaban edit <image>`, `nanaban upscale <image>`, or `-r <file>` exists and is readable.';
+    case 'INPUT_TOO_LARGE':
+      return 'downscale or re-encode the input first (e.g. `sips -Z 2048 <file>` on macOS), then retry.';
+    case 'TIMEOUT':
+      return 'the provider did not answer within the deadline. Retry; raise NANABAN_TIMEOUT_MS (default 240000) for very large generations.';
+    case 'OUTPUT_UNWRITABLE':
+      return 'the image was generated but could not be written to the requested location — check the error message for the salvage path before re-running (re-running pays for a second generation).';
     default:
       return null;
   }
