@@ -4,7 +4,7 @@ import { homedir } from 'os';
 import { OAuth2Client } from 'google-auth-library';
 import { GoogleGenAI } from '@google/genai';
 import { readConfig, readConfigWithPath } from '../lib/config.js';
-import { NB2Error } from '../lib/errors.js';
+import { NB2Error, requestTimeoutMs } from '../lib/errors.js';
 import type { ModelInfo, TransportId } from './models.js';
 import { TRANSPORT_PREFERENCE } from './models.js';
 
@@ -191,8 +191,9 @@ export function resolveRoute(model: ModelInfo, auth: AuthState, forced?: Transpo
 
 export function makeGeminiClient(auth: AuthState): GoogleGenAI {
   if (!auth.gemini) throw new NB2Error('AUTH_MISSING', 'No Gemini auth configured');
+  const httpOptions = { timeout: requestTimeoutMs() };
   if (auth.gemini.type === 'oauth') {
-    return new GoogleGenAI({ googleAuthOptions: { authClient: auth.gemini.client as any } });
+    return new GoogleGenAI({ googleAuthOptions: { authClient: auth.gemini.client as any }, httpOptions });
   }
-  return new GoogleGenAI({ apiKey: auth.gemini.key });
+  return new GoogleGenAI({ apiKey: auth.gemini.key, httpOptions });
 }

@@ -1,16 +1,13 @@
 import type { GoogleGenAI } from '@google/genai';
 import { loadReferenceImage } from './reference.js';
 import { NB2Error } from '../lib/errors.js';
-import type { ImageRequest, ImageResult, AspectRatio, ImageSize } from './types.js';
+import { inspectImage } from '../lib/image-meta.js';
+import type { ImageRequest, ImageResult } from './types.js';
 
-function dimensionsFor(aspectRatio: AspectRatio, size: ImageSize): { width: number; height: number } {
-  const base: Record<ImageSize, number> = { '0.5K': 512, '1K': 1024, '2K': 2048, '4K': 4096 };
-  const b = base[size];
-  const [w, h] = aspectRatio.split(':').map(Number);
-  return w >= h
-    ? { width: b, height: Math.round(b * (h / w)) }
-    : { width: Math.round(b * (w / h)), height: b };
-}
+// Gemini's own block/finish signals for safety filtering. Surfacing these as
+// CONTENT_BLOCKED (non-retryable, exit 3) stops agents from retry-looping a
+// prompt that will be rejected identically every time.
+const BLOCK_REASONS = new Set(['SAFETY', 'IMAGE_SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'OTHER']);
 
 export async function generateViaGemini(
   client: GoogleGenAI,
@@ -20,7 +17,6 @@ export async function generateViaGemini(
 ): Promise<ImageResult> {
   const aspectRatio = request.aspectRatio || '1:1';
   const imageSize = request.imageSize || '1K';
-  const dims = dimensionsFor(aspectRatio, imageSize);
 
   const parts: any[] = [];
 
@@ -32,7 +28,6 @@ export async function generateViaGemini(
   }
 
   let prompt = request.prompt;
-  if (aspectRatio !== '1:1') prompt += `\n\nImage aspect ratio: ${aspectRatio}`;
   if (request.negativePrompt) prompt += `\n\nAvoid: ${request.negativePrompt}`;
   parts.push({ text: prompt });
 
@@ -40,30 +35,53 @@ export async function generateViaGemini(
   const response = await client.models.generateContent({
     model: modelId,
     contents: [{ role: 'user', parts }],
-    config: { responseModalities: ['IMAGE', 'TEXT'] },
+    config: {
+      responseModalities: ['IMAGE', 'TEXT'],
+      // The API only honors aspect/size through imageConfig — prompt prose is
+      // best-effort at most, and --size was previously dropped entirely.
+      imageConfig: { aspectRatio, imageSize },
+    },
   });
+
+  const blockReason = (response as any)?.promptFeedback?.blockReason;
+  if (blockReason) {
+    throw new NB2Error('CONTENT_BLOCKED', `Gemini blocked the prompt (${blockReason}). Reword and try again.`);
+  }
 
   const candidate = response?.candidates?.[0];
   if (!candidate?.content?.parts) {
+    const finish = (candidate as any)?.finishReason;
+    if (finish && BLOCK_REASONS.has(finish)) {
+      throw new NB2Error('CONTENT_BLOCKED', `Gemini blocked the generation (${finish}). Reword and try again.`);
+    }
     throw new NB2Error('GENERATION_FAILED', 'No content returned from Gemini');
   }
 
+  // Gemini 3 image models can emit interim "thought" images before the final
+  // render — take the LAST non-thought inline image, not the first part.
   let buffer: Buffer | null = null;
   let mimeType = 'image/png';
   for (const part of candidate.content.parts) {
-    if (part.inlineData) {
+    if ((part as any).thought) continue;
+    if (part.inlineData?.data) {
       mimeType = part.inlineData.mimeType || mimeType;
-      buffer = Buffer.from(part.inlineData.data!, 'base64');
-      break;
+      buffer = Buffer.from(part.inlineData.data, 'base64');
     }
   }
-  if (!buffer) throw new NB2Error('GENERATION_FAILED', 'No image data returned from Gemini');
+  if (!buffer) {
+    const finish = (candidate as any)?.finishReason;
+    if (finish && BLOCK_REASONS.has(finish)) {
+      throw new NB2Error('CONTENT_BLOCKED', `Gemini blocked the generation (${finish}). Reword and try again.`);
+    }
+    throw new NB2Error('GENERATION_FAILED', 'No image data returned from Gemini');
+  }
 
+  const meta = inspectImage(buffer);
   return {
     buffer,
-    mimeType,
-    width: dims.width,
-    height: dims.height,
+    mimeType: meta.mimeType || mimeType,
+    width: meta.width,
+    height: meta.height,
     modelId,
     transport: 'gemini-direct',
     durationMs: Date.now() - start,

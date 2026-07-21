@@ -54,13 +54,15 @@ describe('transport-codex-oauth', () => {
     assert.equal(res.transport, 'codex-oauth');
     assert.equal(res.modelId, 'gpt-image-2');
     assert.equal(res.mimeType, 'image/png');
-    assert.equal(res.width, 1024);
-    assert.equal(res.height, 1024);
+    // Dimensions are MEASURED from the returned bytes (the bridge ignores the
+    // requested size), so a 1x1 fixture must report 1x1 — never the request.
+    assert.equal(res.width, 1);
+    assert.equal(res.height, 1);
     assert.equal(res.costUsd, 0);
     assert.equal(res.buffer.toString('base64'), TINY_PNG_B64);
   });
 
-  it('uses 1024x1536 for 2:3 and 1536x1024 for 3:2', async () => {
+  it('requests 1024x1536 for 2:3 / 1536x1024 for 3:2 and injects a prompt aspect hint', async () => {
     const events = [JSON.stringify({
       type: 'response.output_item.done',
       item: { type: 'image_generation_call', result: TINY_PNG_B64 },
@@ -71,23 +73,23 @@ describe('transport-codex-oauth', () => {
       return new Response(sseStream(events), { status: 200 });
     }) as FetchFn;
 
-    const tall = await generateViaCodexOAuth(
+    await generateViaCodexOAuth(
       { accessToken: 't', accountId: 'a' },
       'gpt-image-2',
       { mode: 'generate', prompt: 'x', aspectRatio: '2:3' },
     );
-    assert.equal(tall.width, 1024);
-    assert.equal(tall.height, 1536);
     assert.equal(capturedBody.tools[0].size, '1024x1536');
+    // The bridge ignores tools[].size, so the aspect must also be steered
+    // through the prompt (live-verified to work).
+    assert.match(capturedBody.input[0].content.at(-1).text, /2:3 aspect ratio.*portrait/);
 
-    const wide = await generateViaCodexOAuth(
+    await generateViaCodexOAuth(
       { accessToken: 't', accountId: 'a' },
       'gpt-image-2',
       { mode: 'generate', prompt: 'x', aspectRatio: '3:2' },
     );
-    assert.equal(wide.width, 1536);
-    assert.equal(wide.height, 1024);
     assert.equal(capturedBody.tools[0].size, '1536x1024');
+    assert.match(capturedBody.input[0].content.at(-1).text, /3:2 aspect ratio.*landscape/);
   });
 
   it('sends Responses-API shape (input + input_text), not Chat Completions', async () => {

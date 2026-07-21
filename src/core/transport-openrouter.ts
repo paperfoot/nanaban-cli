@@ -1,36 +1,9 @@
 import { loadReferenceImage } from './reference.js';
-import { NB2Error } from '../lib/errors.js';
+import { NB2Error, requestTimeoutMs } from '../lib/errors.js';
+import { inspectImage } from '../lib/image-meta.js';
 import type { ImageRequest, ImageResult } from './types.js';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-
-function parsePngDimensions(buf: Buffer): { width: number; height: number } | null {
-  if (buf.length < 24) return null;
-  const sig = buf.subarray(0, 8).toString('hex');
-  if (sig !== '89504e470d0a1a0a') return null;
-  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
-}
-
-function parseJpegDimensions(buf: Buffer): { width: number; height: number } | null {
-  if (buf[0] !== 0xff || buf[1] !== 0xd8) return null;
-  let i = 2;
-  while (i < buf.length) {
-    if (buf[i] !== 0xff) return null;
-    const marker = buf[i + 1];
-    i += 2;
-    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
-      return { height: buf.readUInt16BE(i + 3), width: buf.readUInt16BE(i + 5) };
-    }
-    const segLen = buf.readUInt16BE(i);
-    i += segLen;
-  }
-  return null;
-}
-
-function parseDimensions(buf: Buffer, mime: string): { width: number; height: number } {
-  const fn = mime.includes('jpeg') ? parseJpegDimensions : parsePngDimensions;
-  return fn(buf) || { width: 0, height: 0 };
-}
 
 export async function generateViaOpenRouter(
   apiKey: string,
@@ -75,9 +48,14 @@ export async function generateViaOpenRouter(
         'X-Title': 'nanaban',
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(requestTimeoutMs()),
     });
   } catch (err) {
-    throw new NB2Error('NETWORK_ERROR', `OpenRouter request failed: ${(err as Error).message}`);
+    const e = err as Error;
+    if (e.name === 'AbortError' || e.name === 'TimeoutError') {
+      throw new NB2Error('TIMEOUT', `OpenRouter request timed out after ${requestTimeoutMs()}ms`);
+    }
+    throw new NB2Error('NETWORK_ERROR', `OpenRouter request failed: ${e.message}`);
   }
 
   if (!res.ok) {
@@ -86,12 +64,24 @@ export async function generateViaOpenRouter(
     try {
       detail = JSON.parse(text)?.error?.message || text;
     } catch { /* not json */ }
-    if (res.status === 401) throw new NB2Error('AUTH_INVALID', `OpenRouter rejected key: ${detail}`);
+    if (res.status === 401 || res.status === 403) throw new NB2Error('AUTH_INVALID', `OpenRouter rejected key: ${detail}`);
+    if (res.status === 402) throw new NB2Error('AUTH_INVALID', `OpenRouter: insufficient credits: ${detail}`);
     if (res.status === 429) throw new NB2Error('RATE_LIMITED', `OpenRouter rate limit: ${detail}`);
+    // 5xx / 408 / 425 are transient upstream failures — NETWORK_ERROR so the
+    // dispatch fallback chain can retry on another transport (the manifest's
+    // documented behavior; GENERATION_FAILED here used to defeat it).
+    if (res.status >= 500 || res.status === 408 || res.status === 425) {
+      throw new NB2Error('NETWORK_ERROR', `OpenRouter ${res.status}: ${detail}`);
+    }
     throw new NB2Error('GENERATION_FAILED', `OpenRouter ${res.status}: ${detail}`);
   }
 
-  const json: any = await res.json();
+  let json: any;
+  try {
+    json = await res.json();
+  } catch (err) {
+    throw new NB2Error('NETWORK_ERROR', `OpenRouter response body unreadable: ${(err as Error).message}`);
+  }
   const msg = json?.choices?.[0]?.message;
   const url: string | undefined = msg?.images?.[0]?.image_url?.url;
   if (!url || !url.startsWith('data:image')) {
@@ -99,17 +89,18 @@ export async function generateViaOpenRouter(
   }
 
   const commaIdx = url.indexOf(',');
-  const meta = url.slice(0, commaIdx);
-  const b64 = url.slice(commaIdx + 1);
-  const mime = meta.match(/data:(image\/[^;]+)/)?.[1] || 'image/png';
-  const buffer = Buffer.from(b64, 'base64');
-  const dims = parseDimensions(buffer, mime);
+  const declaredMime = url.slice(0, commaIdx).match(/data:(image\/[^;]+)/)?.[1] || 'image/png';
+  const buffer = Buffer.from(url.slice(commaIdx + 1), 'base64');
+  if (buffer.length === 0) {
+    throw new NB2Error('GENERATION_FAILED', 'OpenRouter returned an empty image payload');
+  }
+  const meta = inspectImage(buffer);
 
   return {
     buffer,
-    mimeType: mime,
-    width: dims.width,
-    height: dims.height,
+    mimeType: meta.mimeType || declaredMime,
+    width: meta.width,
+    height: meta.height,
     modelId: json.model || modelId,
     transport: 'openrouter',
     durationMs: Date.now() - start,

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { loadReferenceImage } from './reference.js';
-import { NB2Error } from '../lib/errors.js';
+import { NB2Error, requestTimeoutMs } from '../lib/errors.js';
+import { inspectImage } from '../lib/image-meta.js';
 import type { ImageRequest, ImageResult, AspectRatio } from './types.js';
 
 const ENDPOINT = 'https://chatgpt.com/backend-api/codex/responses';
@@ -23,8 +24,12 @@ const MAX_SSE_BUFFER = 32 * 1024 * 1024;
 // one transient upstream blip doesn't fail the whole generate call. Env vars are
 // read at call time (not module load) so tests can tune them.
 const UPSTREAM_TRANSIENT = /stream disconnected before completion|an error occurred while processing your request/i;
-const maxRetries = () => Number(process.env.NANABAN_CODEX_MAX_RETRIES ?? 2);
-const retryBaseMs = () => Number(process.env.NANABAN_CODEX_RETRY_MS ?? 750);
+const envInt = (name: string, fallback: number) => {
+  const raw = Number(process.env[name]);
+  return Number.isFinite(raw) && raw >= 0 ? raw : fallback;
+};
+const maxRetries = () => envInt('NANABAN_CODEX_MAX_RETRIES', 2);
+const retryBaseMs = () => envInt('NANABAN_CODEX_RETRY_MS', 750);
 
 // gpt-image-2 via the Codex bridge accepts these three discrete output sizes.
 // Any aspect ratio outside this set is rejected up front by aspect.ts
@@ -67,7 +72,7 @@ function classifyCodexError(
   if (status === 403 || code === 'forbidden') {
     return new NB2Error('AUTH_INVALID', `Codex bridge forbade this account: ${msg}`);
   }
-  if (status === 429 || code === 'rate_limit_exceeded' || /rate.?limit|quota|exceeded/i.test(msg)) {
+  if (status === 429 || code === 'rate_limit_exceeded' || /rate.?limit|quota/i.test(msg)) {
     return new NB2Error('RATE_LIMITED', `Codex bridge rate-limited (ChatGPT sub quota): ${msg}`);
   }
   if (typeof status === 'number' && status >= 500) {
@@ -77,16 +82,16 @@ function classifyCodexError(
 }
 
 // Streamed `response.failed` / `error` events carry their own status / message.
+// `response.status` is deliberately excluded: in the Responses API it is a
+// lifecycle STRING ('failed'), not an HTTP status, and feeding it to the
+// numeric checks silently disabled in-stream 401/429 classification.
 function classifyStreamFailure(parsed: any): NB2Error {
   const msg: string =
     parsed.response?.error?.message
     ?? parsed.error?.message
     ?? `Codex bridge reported ${parsed.type}`;
-  const status: number | undefined =
-    parsed.response?.status
-    ?? parsed.response?.error?.status
-    ?? parsed.error?.status
-    ?? parsed.status;
+  const candidates = [parsed.response?.status, parsed.response?.error?.status, parsed.error?.status, parsed.status];
+  const status = candidates.find((s): s is number => typeof s === 'number');
   const code: string | undefined =
     parsed.response?.error?.code
     ?? parsed.error?.code;
@@ -155,7 +160,13 @@ export async function generateViaCodexOAuth(
       const nerr = err instanceof NB2Error
         ? err
         : new NB2Error('GENERATION_FAILED', (err as Error)?.message ?? String(err));
-      const transient = UPSTREAM_TRANSIENT.test(nerr.message);
+      // Retry only the known upstream-flake pattern, and only when the error
+      // class is actually generic. A RATE_LIMITED whose upstream detail happens
+      // to match the regex must keep its code (and its exit-4 semantics), not
+      // get burned through 750ms retries and rewritten as GENERATION_FAILED.
+      const transient =
+        (nerr.code === 'GENERATION_FAILED' || nerr.code === 'NETWORK_ERROR')
+        && UPSTREAM_TRANSIENT.test(nerr.message);
       if (!transient) throw nerr;
 
       lastErr = nerr;
@@ -187,7 +198,6 @@ async function attemptCodexOAuth(
 ): Promise<ImageResult> {
   const ratio = request.aspectRatio ?? '1:1';
   const size = resolveSize(ratio);
-  const [width, height] = size.split('x').map(Number);
 
   const content: any[] = [];
   if (request.referenceImages?.length) {
@@ -199,6 +209,15 @@ async function attemptCodexOAuth(
   }
 
   let promptText = request.prompt;
+  // Live-probed 2026-07-21: the bridge IGNORES the tools[].size parameter (a
+  // 1024x1536 request returns a ~1254px square) but the carrier model honors an
+  // explicit aspect instruction in the prompt (same request + this line returned
+  // exactly 1024x1536). Prompt steering is the only working aspect control here.
+  if (ratio !== '1:1') {
+    const [rw, rh] = ratio.split(':').map(Number);
+    const orientation = rw > rh ? 'landscape (wider than tall)' : 'portrait (taller than wide)';
+    promptText += `\n\nThe image MUST have a ${ratio} aspect ratio, ${orientation}.`;
+  }
   if (request.negativePrompt) promptText += `\n\nAvoid: ${request.negativePrompt}`;
   content.push({ type: 'input_text', text: promptText });
 
@@ -217,6 +236,11 @@ async function attemptCodexOAuth(
 
   const start = Date.now();
 
+  // One deadline covers the whole exchange including SSE reads — undici aborts
+  // in-flight body reads when the signal fires, so a bridge that hangs
+  // mid-stream can no longer hang the calling agent indefinitely.
+  const deadline = AbortSignal.timeout(requestTimeoutMs());
+
   let res: Response;
   try {
     res = await fetch(ENDPOINT, {
@@ -231,9 +255,14 @@ async function attemptCodexOAuth(
         'Session-Id': randomUUID(),
       },
       body: JSON.stringify(body),
+      signal: deadline,
     });
   } catch (err) {
-    throw new NB2Error('NETWORK_ERROR', `Codex bridge request failed: ${(err as Error).message}`);
+    const e = err as Error;
+    if (e.name === 'AbortError' || e.name === 'TimeoutError') {
+      throw new NB2Error('TIMEOUT', `Codex bridge timed out after ${requestTimeoutMs()}ms`);
+    }
+    throw new NB2Error('NETWORK_ERROR', `Codex bridge request failed: ${e.message}`);
   }
 
   if (!res.ok) {
@@ -258,8 +287,18 @@ async function attemptCodexOAuth(
 
   try {
     outer: while (true) {
-      const { done, value } = await reader.read();
+      let done: boolean, value: Uint8Array | undefined;
+      try {
+        ({ done, value } = await reader.read());
+      } catch (err) {
+        const e = err as Error;
+        if (deadline.aborted || e.name === 'AbortError' || e.name === 'TimeoutError') {
+          throw new NB2Error('TIMEOUT', `Codex bridge stream timed out after ${requestTimeoutMs()}ms`);
+        }
+        throw new NB2Error('NETWORK_ERROR', `Codex bridge stream failed: ${e.message}`);
+      }
       if (done) break;
+      if (!value) continue;
       // Check the cap BEFORE concatenating — otherwise a single oversized chunk
       // would already have blown the budget by the time we detected it.
       const chunk = decoder.decode(value, { stream: true });
@@ -322,11 +361,17 @@ async function attemptCodexOAuth(
   }
 
   const buffer = Buffer.from(base64, 'base64');
+  if (buffer.length === 0) {
+    throw new NB2Error('GENERATION_FAILED', 'Codex bridge returned an empty image payload');
+  }
+  // Measure, never trust: the bridge picks its own output size (observed
+  // ~1254x1254 for square requests regardless of the size parameter).
+  const meta = inspectImage(buffer);
   return {
     buffer,
-    mimeType: 'image/png',
-    width,
-    height,
+    mimeType: meta.mimeType || 'image/png',
+    width: meta.width,
+    height: meta.height,
     modelId,
     transport: 'codex-oauth',
     durationMs: Date.now() - start,
