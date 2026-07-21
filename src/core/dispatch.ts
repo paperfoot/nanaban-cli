@@ -168,6 +168,20 @@ async function runRoute(
 }
 
 export async function dispatch(opts: DispatchOptions): Promise<DispatchResult> {
+  // Validate file references before anything else — a missing file must be
+  // IMAGE_NOT_FOUND (exit 3) on every machine, not AUTH_MISSING (exit 2) on
+  // hosts that happen to have no credentials configured.
+  for (const ref of opts.referenceImages ?? []) {
+    if (ref.source === 'file' && ref.path) {
+      const p = opts.basePath ? path.resolve(opts.basePath, ref.path) : path.resolve(ref.path);
+      try {
+        await fs.access(p);
+      } catch {
+        throw new NB2Error('IMAGE_NOT_FOUND', `Reference image not found: ${p}`);
+      }
+    }
+  }
+
   const auth = await detectAuth();
   const requestedAspect = opts.aspect ? parseAspectRatio(opts.aspect) : undefined;
   const imageSize = parseImageSize(opts.size || '1K');
