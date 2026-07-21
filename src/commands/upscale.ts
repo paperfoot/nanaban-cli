@@ -38,7 +38,7 @@ export async function runUpscale(imagePath: string, opts: UpscaleCommandOpts): P
       basePath: process.cwd(),
     });
 
-    const stem = path.basename(imagePath, path.extname(imagePath));
+    const stem = path.basename(imagePath, path.extname(imagePath)).replace(/[_-]+/g, ' ');
     const filePath = await saveImage(result.buffer, {
       outputPath: opts.output,
       prompt: `${stem} upscaled ${scale}x`,

@@ -72,13 +72,20 @@ async function rerenderUpscale(
   if (!model) throw new NB2Error('MODEL_NOT_FOUND', `Unknown rerender model "${modelName}"`);
   if (!model.caps.edit) throw new NB2Error('CAPABILITY_UNSUPPORTED', `${model.display} cannot take an input image`);
 
-  // Smallest supported size whose base edge covers input-long-edge x scale.
-  const targetEdge = Math.max(input.width, input.height) * opts.scale;
+  // Closest supported size to input-long-edge x scale (by log-ratio). Closest
+  // beats smallest-that-covers: a 1254px input at 2x used to select 4K — a
+  // 3.3x overshoot that costs more and that some routes reject outright
+  // (OpenRouter's stable flash id 400s on 4K; live-observed 2026-07-21).
+  const inputEdge = Math.max(input.width, input.height);
+  const targetEdge = inputEdge * opts.scale;
   const supported = model.caps.sizes.slice().sort((a, b) => SIZE_BASE[a] - SIZE_BASE[b]);
-  const size = supported.find(s => SIZE_BASE[s] >= targetEdge) ?? supported[supported.length - 1];
-  if (SIZE_BASE[size] < targetEdge) {
+  const size = supported.reduce((best, s) =>
+    Math.abs(Math.log(SIZE_BASE[s] / targetEdge)) < Math.abs(Math.log(SIZE_BASE[best] / targetEdge)) ? s : best,
+  );
+  const actualScale = SIZE_BASE[size] / inputEdge;
+  if (Math.abs(actualScale - opts.scale) > 0.25) {
     warnings.push(
-      `${model.display} tops out at ${size} — output will be ${SIZE_BASE[size]}px on the long edge, not the requested ${opts.scale}x.`,
+      `${model.display} renders at fixed sizes — output is ${size} (${SIZE_BASE[size]}px long edge, ~${actualScale.toFixed(1)}x), not exactly ${opts.scale}x. Use --engine real-esrgan for exact scaling.`,
     );
   }
 
