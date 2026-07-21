@@ -8,6 +8,8 @@ const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 export interface NB2Config {
   apiKey?: string;
   openRouterKey?: string;
+  replicateKey?: string;
+  recraftKey?: string;
   oauthClientId?: string;
   oauthClientSecret?: string;
 }
