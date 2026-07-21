@@ -6,23 +6,23 @@ import { homedir } from 'os';
 // matches against the user's request to decide whether to invoke nanaban. The body
 // is a one-line reminder to call `nanaban agent-info` for the full manifest, so the
 // skill doesn't drift out of sync with real capabilities. Keep under ~1 KB.
-const SKILL_CONTENT = `---
+export const SKILL_CONTENT = `---
 name: nanaban
-description: Generate, edit, or modify images from the terminal via the \\\`nanaban\\\` CLI — use whenever the user asks to create, make, generate, render, draw, produce, design, edit, modify, or change an image, picture, photo, illustration, graphic, icon, logo, banner, hero, thumbnail, wallpaper, product shot, concept art, mockup, or visual. nanaban is the CLI, not a model — it routes to GPT Image 2 (default on ChatGPT Plus/Pro, free via Codex OAuth), Nano Banana 2 / 2 Lite / Pro (Gemini), and GPT-5.x Image. If the user says "nano banana", that is a model nanaban serves (--model nb2, nb2-lite, or nb2-pro), not a different tool. Run \\\`nanaban agent-info\\\` for the machine-readable manifest of every model, transport, flag, and error code (including a per-code recovery map).
+description: Generate, edit, upscale, or modify images from the terminal via the \`nanaban\` CLI — use whenever the user asks to create, make, generate, render, draw, produce, design, edit, modify, upscale, enlarge, sharpen, or change an image, picture, photo, illustration, graphic, icon, logo, banner, hero, thumbnail, wallpaper, product shot, concept art, mockup, or visual. nanaban is the CLI, not a model — it routes to GPT Image 2 (default on ChatGPT Plus/Pro, free via Codex OAuth), Nano Banana 2 / 2 Lite / Pro (Gemini), and GPT-5.x Image, plus Real-ESRGAN / Recraft for true super-resolution upscaling. If the user says "nano banana", that is a model nanaban serves (--model nb2, nb2-lite, or nb2-pro), not a different tool. Run \`nanaban agent-info\` for the machine-readable manifest of every model, transport, flag, and error code (including a per-code recovery map).
 ---
 
 # nanaban
 
-\\\`\\\`\\\`bash
+\`\`\`bash
 nanaban "PROMPT"                        # generate (auto-names file, saves to CWD)
-nanaban "PROMPT" -o out.png --ar wide   # custom path, 16:9
-nanaban edit photo.png "add sunglasses" # edit an existing image
-nanaban auth                            # show what's reachable
+nanaban "PROMPT" --ar wide --model nb2  # 16:9 via Nano Banana (default gpt-image-2 approximates non-square via prompt steering)
+nanaban edit photo.png "add sunglasses" # edit (keeps the source aspect ratio by default)
+nanaban upscale photo.png --scale 2     # upscale: real SR with REPLICATE_API_TOKEN/RECRAFT_API_TOKEN, else labeled generative re-render
 nanaban auth --check                    # live-validate keys, show credits
 nanaban agent-info                      # full capability manifest (use this)
-\\\`\\\`\\\`
+\`\`\`
 
-Pass \\\`--json\\\` for structured output (status/file/model/transport/cost_usd/duration_ms). Stdout is always just the file path — compose with \\\`xargs\\\`, \\\`pbcopy\\\`, etc.
+Pass \`--json\` for a structured envelope (status/file/model/transport/cost_usd/duration_ms; errors carry code + hint). Without --json, stdout is just the file path — compose with \`xargs\`, \`pbcopy\`, etc. Exit codes: 0 ok · 1 transient (retry) · 2 config (fix auth) · 3 bad input (fix args) · 4 rate-limited (wait).
 `;
 
 interface SkillTarget {
@@ -58,14 +58,17 @@ export async function runSkillInstall(json: boolean): Promise<void> {
     }
   }
 
+  const failed = results.filter(r => r.status !== 'installed');
   if (json) {
-    process.stdout.write(JSON.stringify({ status: 'success', targets: results }) + '\n');
+    const status = failed.length === 0 ? 'success' : failed.length === results.length ? 'error' : 'partial';
+    process.stdout.write(JSON.stringify({ status, targets: results }) + '\n');
   } else {
     for (const r of results) {
       const icon = r.status === 'installed' ? '\u2713' : '\u2717';
       process.stderr.write(`${icon} ${r.name}: ${r.path}\n`);
     }
   }
+  if (failed.length === results.length) process.exitCode = 2;
 }
 
 export async function runSkillStatus(json: boolean): Promise<void> {

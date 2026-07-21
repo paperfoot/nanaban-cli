@@ -1,8 +1,14 @@
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+// Drift guards: the manifest must be asserted against the REAL implementation
+// exports, not against hand-copied literals that can rot independently.
+import { TRANSPORT_PREFERENCE } from '../src/core/models.js';
+import { EXIT_CODES, transientCodes } from '../src/lib/errors.js';
+import { SKILL_CONTENT } from '../src/commands/skill.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
@@ -84,30 +90,25 @@ describe('agent-info', () => {
     assert.match(auth.description, /--check/, 'auth command must document --check');
   });
 
-  it('declares all three transports', () => {
+  it('declares all five transports (3 generation + 2 upscale)', () => {
     const { stdout } = run(['agent-info']);
     const manifest = JSON.parse(stdout);
     const ids = manifest.transports.map((t: any) => t.id);
-    assert.deepEqual(ids.sort(), ['codex-oauth', 'gemini-direct', 'openrouter']);
+    assert.deepEqual(ids.sort(), ['codex-oauth', 'gemini-direct', 'openrouter', 'recraft', 'replicate']);
   });
 
-  it('prefers codex-oauth over others', () => {
+  it('preference order matches TRANSPORT_PREFERENCE (drift guard)', () => {
     const { stdout } = run(['agent-info']);
     const manifest = JSON.parse(stdout);
-    assert.deepEqual(
-      manifest.auth_resolution.preference_order,
-      ['codex-oauth', 'openrouter', 'gemini-direct'],
-      'Codex must be preferred first — it is $0 for Plus users',
-    );
+    assert.deepEqual(manifest.auth_resolution.preference_order, TRANSPORT_PREFERENCE);
   });
 
-  it('declares automatic fallback on transient errors', () => {
+  it('fallback retry codes match isTransient() exactly (drift guard)', () => {
     const { stdout } = run(['agent-info']);
     const manifest = JSON.parse(stdout);
     const fb = manifest.auth_resolution.fallback_behavior;
     assert.equal(fb.enabled, true, 'fallback must be enabled');
-    assert.ok(fb.retry_on_codes.includes('RATE_LIMITED'), 'must retry on RATE_LIMITED');
-    assert.ok(fb.retry_on_codes.includes('NETWORK_ERROR'), 'must retry on NETWORK_ERROR');
+    assert.deepEqual(fb.retry_on_codes.slice().sort(), transientCodes().sort());
     assert.match(fb.disabled_when, /--via/, 'must document that --via disables fallback');
   });
 
@@ -117,17 +118,39 @@ describe('agent-info', () => {
     assert.match(manifest.output_contract.json_envelope.error, /hint/, 'error envelope must include hint');
   });
 
-  it('lists framework exit codes 0-4', () => {
+  it('every error code in the manifest matches EXIT_CODES (drift guard)', () => {
     const { stdout } = run(['agent-info']);
     const manifest = JSON.parse(stdout);
     const exitCodes = manifest.exit_codes.map((e: any) => e.code);
     assert.deepEqual(exitCodes.sort(), [0, 1, 2, 3, 4]);
-    const rateLimited = manifest.error_codes.find((e: any) => e.code === 'RATE_LIMITED');
-    assert.equal(rateLimited.exit_code, 4, 'RATE_LIMITED must exit 4');
-    const authMissing = manifest.error_codes.find((e: any) => e.code === 'AUTH_MISSING');
-    assert.equal(authMissing.exit_code, 2, 'AUTH_MISSING is a config error (2)');
-    const badModel = manifest.error_codes.find((e: any) => e.code === 'MODEL_NOT_FOUND');
-    assert.equal(badModel.exit_code, 3, 'MODEL_NOT_FOUND is bad input (3)');
+    assert.deepEqual(
+      manifest.error_codes.map((e: any) => e.code).sort(),
+      Object.keys(EXIT_CODES).sort(),
+      'manifest must list exactly the implemented error codes',
+    );
+    for (const e of manifest.error_codes) {
+      assert.equal(e.exit_code, (EXIT_CODES as any)[e.code], `${e.code} exit code drifted`);
+      assert.ok(e.recovery, `${e.code} must carry a recovery string`);
+    }
+  });
+
+  it('declares the upscale operation with all three engines', () => {
+    const { stdout } = run(['agent-info']);
+    const manifest = JSON.parse(stdout);
+    const up = manifest.operations.upscale;
+    assert.equal(up.supported, true);
+    const engines = up.engines.map((e: any) => e.engine);
+    assert.deepEqual(engines.sort(), ['crisp', 'real-esrgan', 'rerender']);
+    const rerender = up.engines.find((e: any) => e.engine === 'rerender');
+    assert.equal(rerender.method, 'generative_rerender');
+    assert.equal(rerender.content_preservation, 'not_preserved');
+  });
+
+  it('root SKILL.md is byte-identical to the installed skill content (drift guard)', () => {
+    const onDisk = readFileSync(join(root, 'SKILL.md'), 'utf-8');
+    assert.equal(onDisk, SKILL_CONTENT);
+    assert.ok(!SKILL_CONTENT.includes('\\`'), 'skill must not contain broken backtick escapes');
+    assert.match(SKILL_CONTENT, /```bash/, 'code fence must render correctly');
   });
 
   it('unknown model exits 3 (bad input)', () => {

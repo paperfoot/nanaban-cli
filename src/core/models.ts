@@ -18,7 +18,11 @@ export interface ModelInfo {
   ids: Partial<Record<TransportId, string>>;
   aliases: string[];
   caps: ModelCaps;
+  /** Estimated cost at 1K; Gemini pricing varies with output size. */
   costPerImageUsd: number;
+  /** Honest caveats agents must know (bridge quirks, upcoming retirement). */
+  notes?: string;
+  deprecated?: boolean;
 }
 
 const STD_RATIOS: AspectRatio[] = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'];
@@ -56,11 +60,13 @@ export const MODELS: ModelInfo[] = [
     caps: {
       aspectRatios: STD_RATIOS,
       sizes: ['1K'],
-      maxRefImages: 14,
-      edit: true,
+      // Google docs (2026-07): flash-lite is text-to-image only, no reference images.
+      maxRefImages: 0,
+      edit: false,
       negativePrompt: true,
     },
     costPerImageUsd: 0.034,
+    notes: 'Text-to-image only per Google docs — no editing, no reference images.',
   },
   {
     id: 'nb2-pro',
@@ -78,7 +84,8 @@ export const MODELS: ModelInfo[] = [
       edit: true,
       negativePrompt: true,
     },
-    costPerImageUsd: 0.136,
+    // Gemini pricing page (2026-07): $0.134 at 1K/2K, $0.24 at 4K.
+    costPerImageUsd: 0.134,
   },
   {
     id: 'gpt5',
@@ -96,6 +103,8 @@ export const MODELS: ModelInfo[] = [
       negativePrompt: false,
     },
     costPerImageUsd: 0.193,
+    deprecated: true,
+    notes: 'Built on the GPT-5-chat + GPT Image 1 stack that OpenAI is retiring (components sunset from 2026-07-23). Prefer gpt54 or gpt-image-2.',
   },
   {
     id: 'gpt5-mini',
@@ -113,6 +122,8 @@ export const MODELS: ModelInfo[] = [
       negativePrompt: false,
     },
     costPerImageUsd: 0.041,
+    deprecated: true,
+    notes: 'Built on the retiring GPT Image 1-mini stack (sunset 2026-12-01). Prefer gpt54 or gpt-image-2.',
   },
   {
     id: 'gpt54',
@@ -138,6 +149,9 @@ export const MODELS: ModelInfo[] = [
     family: 'openai',
     ids: {
       'codex-oauth': 'gpt-image-2',
+      // OpenRouter added openai/gpt-image-2 (2026) — a metered fallback so the
+      // default model finally has a second route when the bridge is down.
+      'openrouter': 'openai/gpt-image-2',
     },
     // Canonical id is `gpt-image-2`; `gi2` is a short alias; `img2`/`images2` match OpenAI's "ChatGPT Images 2.0" branding.
     aliases: ['gi2', 'gpt-image-2', 'img2', 'images2'],
@@ -149,8 +163,10 @@ export const MODELS: ModelInfo[] = [
       edit: true,
       negativePrompt: false,
     },
-    // Billed against the user's ChatGPT Plus/Pro subscription, not per-image.
+    // $0 on the codex-oauth route (billed to the ChatGPT sub); metered when
+    // the openrouter fallback route is used (envelope reports actual cost).
     costPerImageUsd: 0,
+    notes: 'Via the Codex bridge the backend picks the output size (~1254px square observed regardless of the size parameter) and aspect ratio is steered through the prompt — approximate, not exact. The envelope always reports measured dimensions. For exact sizes use a Gemini model or the openrouter route.',
   },
 ];
 
