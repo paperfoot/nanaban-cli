@@ -92,7 +92,7 @@ curl -L https://github.com/paperfoot/nanaban-cli/releases/latest/download/nanaba
 curl -L https://github.com/paperfoot/nanaban-cli/releases/latest/download/nanaban-linux-arm64 -o /usr/local/bin/nanaban && chmod +x /usr/local/bin/nanaban
 ```
 
-**npm** (if you already have Node 18+):
+**npm** (if you already have Node 20+):
 
 ```bash
 npm install -g nanaban
@@ -184,9 +184,10 @@ nanaban "prompt" --pro                    # Nano Banana Pro
 nanaban "prompt" --model gpt-image-2      # force GPT Image 2 (needs Codex auth)
 nanaban "prompt" --model gpt5-mini        # force GPT-5 Image Mini
 nanaban "prompt" --via codex-oauth        # force the ChatGPT sub route
-nanaban "prompt" --neg "blurry, text"     # negative prompt (Gemini only)
+nanaban "prompt" --neg "blurry, text"     # negative prompt (native on Gemini, prompt-emulated elsewhere)
 nanaban "prompt" -r style.png             # reference image
-nanaban edit photo.png "add sunglasses"   # edit existing image (works with every model)
+nanaban edit photo.png "add sunglasses"   # edit existing image
+nanaban upscale photo.png --scale 2          # upscale (real SR or labeled re-render)
 ```
 
 ### Flags
@@ -248,7 +249,26 @@ nanaban edit headshot.png "make it a pencil sketch"
 nanaban edit product.png "place on a marble table" --ar wide
 ```
 
-Takes a source image and your edit instruction. Same flags apply — pick a model, change aspect ratio, resolution, or use Pro for finer edits.
+Takes a source image and your edit instruction. Same flags apply — pick a model, change aspect ratio, resolution, or use Pro for finer edits. With no `--ar`, the output keeps the source image's aspect ratio.
+
+## Upscaling
+
+```bash
+nanaban upscale photo.png                    # 2x, best available engine
+nanaban upscale photo.png --scale 4          # 4x
+nanaban upscale photo.png --engine crisp     # force Recraft Crisp Upscale
+nanaban upscale face.png --face-enhance      # GFPGAN face restore (Real-ESRGAN)
+```
+
+Three engines, honestly labeled:
+
+| Engine | What it is | Needs | ~Cost |
+|--------|-----------|-------|-------|
+| `real-esrgan` | True super-resolution (Replicate). Content-preserving, best-effort. | `REPLICATE_API_TOKEN` | $0.002/image |
+| `crisp` | Recraft Crisp Upscale. Content-preserving, best-effort. | `RECRAFT_API_TOKEN` | $0.004/image |
+| `rerender` | Generative re-render at 2K/4K through a generation model (default `nb2-pro`). **Re-synthesizes every pixel — content can drift.** | any generation auth | model price |
+
+`--engine auto` (the default) prefers real super-resolution and only falls back to `rerender` with a visible warning — the JSON envelope always states `method` (`super_resolution` vs `generative_rerender`) and `content_preservation`, so agents and scripts can never mistake one for the other.
 
 ## For LLM Agents and Scripts
 
@@ -297,9 +317,9 @@ When auto-fallback kicks in and eventually succeeds, the success envelope carrie
 }
 ```
 
-Error codes: `AUTH_MISSING`, `AUTH_INVALID`, `AUTH_EXPIRED`, `PROMPT_MISSING`, `IMAGE_NOT_FOUND`, `GENERATION_FAILED`, `RATE_LIMITED`, `NETWORK_ERROR`, `MODEL_NOT_FOUND`, `TRANSPORT_UNAVAILABLE`, `CAPABILITY_UNSUPPORTED`.
+Error codes: `AUTH_MISSING`, `AUTH_INVALID`, `AUTH_EXPIRED`, `PROMPT_MISSING`, `BAD_ARGUMENT`, `IMAGE_NOT_FOUND`, `INPUT_TOO_LARGE`, `GENERATION_FAILED`, `CONTENT_BLOCKED`, `RATE_LIMITED`, `NETWORK_ERROR`, `TIMEOUT`, `MODEL_NOT_FOUND`, `TRANSPORT_UNAVAILABLE`, `CAPABILITY_UNSUPPORTED`, `OUTPUT_UNWRITABLE`.
 
-Exit codes: `0` success, `1` runtime error, `2` usage error.
+Exit codes: `0` success · `1` transient (retry) · `2` config error (fix auth) · `3` bad input (fix arguments) · `4` rate limited (wait).
 
 Discover everything machine-readably: `nanaban agent-info`.
 
