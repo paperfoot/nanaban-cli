@@ -67,10 +67,14 @@ async function rerenderUpscale(
   input: { width: number; height: number },
   warnings: string[],
 ): Promise<UpscaleOutcome> {
-  const modelName = opts.modelName ?? 'nb2-pro';
+  // Default to nb2, not nb-pro: Pro needs a Gemini key (its OpenRouter route
+  // silently downgrades), so defaulting to it made the no-key fallback path fail
+  // outright. nb2 reaches 4K on both gemini-direct and OpenRouter.
+  const modelName = opts.modelName ?? 'nb2';
   const model = resolveModel(modelName);
   if (!model) throw new NB2Error('MODEL_NOT_FOUND', `Unknown rerender model "${modelName}"`);
-  if (!model.caps.edit) throw new NB2Error('CAPABILITY_UNSUPPORTED', `${model.display} cannot take an input image`);
+  const editable = Object.values(model.routes).some(r => r.edit);
+  if (!editable) throw new NB2Error('CAPABILITY_UNSUPPORTED', `${model.display} cannot take an input image`);
 
   // Closest supported size to input-long-edge x scale (by log-ratio). Closest
   // beats smallest-that-covers: a 1254px input at 2x used to select 4K — a
@@ -78,7 +82,11 @@ async function rerenderUpscale(
   // (OpenRouter's stable flash id 400s on 4K; live-observed 2026-07-21).
   const inputEdge = Math.max(input.width, input.height);
   const targetEdge = inputEdge * opts.scale;
-  const supported = model.caps.sizes.slice().sort((a, b) => SIZE_BASE[a] - SIZE_BASE[b]);
+  // Union of every size any route of this model can serve — the planner picks
+  // the route that can actually deliver the one we choose.
+  const all = new Set<ImageSize>();
+  for (const r of Object.values(model.routes)) for (const s of r.sizes) all.add(s);
+  const supported = [...all].sort((a, b) => SIZE_BASE[a] - SIZE_BASE[b]);
   const size = supported.reduce((best, s) =>
     Math.abs(Math.log(SIZE_BASE[s] / targetEdge)) < Math.abs(Math.log(SIZE_BASE[best] / targetEdge)) ? s : best,
   );
@@ -112,8 +120,8 @@ async function rerenderUpscale(
     providerModel: result.modelId,
     transport: result.transport,
     durationMs: result.durationMs,
-    costUsd: result.costUsd ?? result.model.costPerImageUsd,
-    warnings,
+    costUsd: result.costUsd,
+    warnings: [...warnings, ...result.warnings],
   };
 }
 

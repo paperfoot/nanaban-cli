@@ -5,8 +5,9 @@ import { OAuth2Client } from 'google-auth-library';
 import { GoogleGenAI } from '@google/genai';
 import { readConfig, readConfigWithPath } from '../lib/config.js';
 import { NB2Error, requestTimeoutMs } from '../lib/errors.js';
-import type { ModelInfo, TransportId } from './models.js';
-import { TRANSPORT_PREFERENCE } from './models.js';
+import type { ModelInfo, TransportId, RouteCaps } from './models.js';
+import { TRANSPORT_PREFERENCE, providerModelFor } from './models.js';
+import type { ImageSize } from './types.js';
 
 export type KeyedSource =
   | { type: 'env'; key: string; name: string }
@@ -130,7 +131,9 @@ export function transportAvailable(t: TransportId, auth: AuthState): boolean {
 
 export interface ResolvedRoute {
   transport: TransportId;
+  /** Provider-side model id, already resolved for the requested output size. */
   modelId: string;
+  caps: RouteCaps;
   authKey?: string;
   oauthClient?: OAuth2Client;
   codexToken?: string;
@@ -138,31 +141,37 @@ export interface ResolvedRoute {
 }
 
 // Single source of truth for "assemble a concrete route for (model, auth, transport)".
-// Returns null if the model has no mapping on this transport OR the transport has
-// no configured auth. dispatch.ts (auto fallback chain) and resolveRoute (explicit
-// --via) both call through this so they can never drift out of sync.
-export function buildRoute(model: ModelInfo, auth: AuthState, t: TransportId): ResolvedRoute | null {
-  const modelId = model.ids[t];
-  if (!modelId) return null;
+// Returns null if the model has no route on this transport OR the transport has
+// no configured auth. The requested size matters because some routes serve
+// different provider model ids per size (OpenRouter's 4K preview ids).
+export function buildRoute(
+  model: ModelInfo,
+  auth: AuthState,
+  t: TransportId,
+  size: ImageSize = '1K',
+): ResolvedRoute | null {
+  const caps = model.routes[t];
+  if (!caps) return null;
   if (!transportAvailable(t, auth)) return null;
+  const modelId = providerModelFor(caps, size);
   if (t === 'gemini-direct') {
     const g = auth.gemini!;
-    if (g.type === 'oauth') return { transport: t, modelId, oauthClient: g.client };
-    return { transport: t, modelId, authKey: g.key };
+    if (g.type === 'oauth') return { transport: t, modelId, caps, oauthClient: g.client };
+    return { transport: t, modelId, caps, authKey: g.key };
   }
   if (t === 'codex-oauth') {
     const c = auth.codex!;
-    return { transport: t, modelId, codexToken: c.accessToken, codexAccountId: c.accountId };
+    return { transport: t, modelId, caps, codexToken: c.accessToken, codexAccountId: c.accountId };
   }
-  return { transport: t, modelId, authKey: auth.openRouter!.key };
+  return { transport: t, modelId, caps, authKey: auth.openRouter!.key };
 }
 
 // Enumerate every reachable route for a model, in TRANSPORT_PREFERENCE order.
 // Used by the auto-fallback chain in dispatch.ts.
-export function routesForModel(model: ModelInfo, auth: AuthState): ResolvedRoute[] {
+export function routesForModel(model: ModelInfo, auth: AuthState, size: ImageSize = '1K'): ResolvedRoute[] {
   const out: ResolvedRoute[] = [];
   for (const t of TRANSPORT_PREFERENCE) {
-    const r = buildRoute(model, auth, t);
+    const r = buildRoute(model, auth, t, size);
     if (r) out.push(r);
   }
   return out;
@@ -178,14 +187,19 @@ export function needsForTransport(t: TransportId): string {
 }
 
 export function needsForModel(model: ModelInfo): string[] {
-  return Object.keys(model.ids).map(t => needsForTransport(t as TransportId));
+  return Object.keys(model.routes).map(t => needsForTransport(t as TransportId));
 }
 
-export function resolveRoute(model: ModelInfo, auth: AuthState, forced?: TransportId): ResolvedRoute {
+export function resolveRoute(
+  model: ModelInfo,
+  auth: AuthState,
+  forced?: TransportId,
+  size: ImageSize = '1K',
+): ResolvedRoute {
   if (forced) {
-    const r = buildRoute(model, auth, forced);
+    const r = buildRoute(model, auth, forced, size);
     if (!r) {
-      const reason = !model.ids[forced]
+      const reason = !model.routes[forced]
         ? `${model.id} cannot run on ${forced}`
         : `${forced} requires ${needsForTransport(forced)}`;
       throw new NB2Error('TRANSPORT_UNAVAILABLE', reason);
@@ -194,7 +208,7 @@ export function resolveRoute(model: ModelInfo, auth: AuthState, forced?: Transpo
   }
 
   for (const t of TRANSPORT_PREFERENCE) {
-    const r = buildRoute(model, auth, t);
+    const r = buildRoute(model, auth, t, size);
     if (r) return r;
   }
 

@@ -39,6 +39,14 @@ export async function generateViaGemini(
       responseModalities: ['IMAGE', 'TEXT'],
       // The API only honors aspect/size through imageConfig — prompt prose is
       // best-effort at most, and --size was previously dropped entirely.
+      //
+      // No output-format control exists here, deliberately not attempted: Gemini
+      // returns baseline JPEG and ONLY JPEG. Verified 2026-07-24 — imageConfig
+      // rejects every mime field name ("Cannot find field"), and the newer
+      // Interactions API answers `response_format.mime_type: image/png` with
+      // "Supported values: 'image/jpeg'". So Gemini output carries JPEG
+      // compression by nature; that is a provider limit, not a nanaban one.
+      // Callers who need lossless pixels should use gpt-image-2, which emits PNG.
       imageConfig: { aspectRatio, imageSize },
     },
   });

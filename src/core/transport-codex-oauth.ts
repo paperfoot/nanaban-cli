@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { loadReferenceImage } from './reference.js';
 import { NB2Error, requestTimeoutMs } from '../lib/errors.js';
 import { inspectImage } from '../lib/image-meta.js';
-import type { ImageRequest, ImageResult, AspectRatio } from './types.js';
+import type { ImageRequest, ImageResult } from './types.js';
 
 const ENDPOINT = 'https://chatgpt.com/backend-api/codex/responses';
 
@@ -31,25 +31,17 @@ const envInt = (name: string, fallback: number) => {
 const maxRetries = () => envInt('NANABAN_CODEX_MAX_RETRIES', 2);
 const retryBaseMs = () => envInt('NANABAN_CODEX_RETRY_MS', 750);
 
-// gpt-image-2 via the Codex bridge accepts these three discrete output sizes.
-// Any aspect ratio outside this set is rejected up front by aspect.ts
-// (see GPT_IMAGE_2_RATIOS in models.ts), so this map only needs to cover them.
-const SIZE_FOR_RATIO: Partial<Record<AspectRatio, string>> = {
-  '1:1': '1024x1024',
-  '2:3': '1024x1536',
-  '3:2': '1536x1024',
-};
-
-function resolveSize(ratio: AspectRatio): string {
-  const size = SIZE_FOR_RATIO[ratio];
-  if (!size) {
-    throw new NB2Error(
-      'CAPABILITY_UNSUPPORTED',
-      `gpt-image-2 via codex-oauth only supports aspect ratios 1:1, 2:3, 3:2 (got ${ratio})`,
-    );
-  }
-  return size;
-}
+// Live-probed 2026-07-23 across six configurations (size 1024x1536, 2048x2048,
+// 2560x1440, 3824x2144, "auto", and an explicit quality:"high"): the bridge
+// IGNORES the requested size and quality entirely and echoes back its own
+// choice — `{"size":"1254x1254","quality":"low"}` — every single time.
+//
+// The real invariant is a fixed ~1.57 MP budget that gets redistributed when the
+// prompt steers the frame (a 16:9 request yields 1672x941 = the same pixel
+// count). So we no longer send a size at all: it is dead weight on the wire and
+// pretending otherwise misled callers. Aspect is steered through prose, which
+// is the only control that actually works here. The budget itself is declared
+// once, on the route, as `fixedPixelBudget` in models.ts.
 
 export interface CodexOAuthAuth {
   accessToken: string;
@@ -197,7 +189,6 @@ async function attemptCodexOAuth(
   basePath?: string,
 ): Promise<ImageResult> {
   const ratio = request.aspectRatio ?? '1:1';
-  const size = resolveSize(ratio);
 
   const content: any[] = [];
   if (request.referenceImages?.length) {
@@ -209,10 +200,10 @@ async function attemptCodexOAuth(
   }
 
   let promptText = request.prompt;
-  // Live-probed 2026-07-21: the bridge IGNORES the tools[].size parameter (a
-  // 1024x1536 request returns a ~1254px square) but the carrier model honors an
-  // explicit aspect instruction in the prompt (same request + this line returned
-  // exactly 1024x1536). Prompt steering is the only working aspect control here.
+  // Prompt steering is the ONLY working frame control on this route (see the
+  // CODEX_FIXED_PIXELS note above). Every ratio is steerable, not just the three
+  // v5 allowed — refusing 16:9 here was a fiction that made callers plan
+  // elaborate workarounds for a limit that did not exist.
   if (ratio !== '1:1') {
     const [rw, rh] = ratio.split(':').map(Number);
     const orientation = rw > rh ? 'landscape (wider than tall)' : 'portrait (taller than wide)';
@@ -227,7 +218,9 @@ async function attemptCodexOAuth(
       'You generate or edit images using the image_generation tool. ' +
       'Always call the tool exactly once and return the result. Do not describe the image in text.',
     input: [{ type: 'message', role: 'user', content }],
-    tools: [{ type: 'image_generation', output_format: 'png', size }],
+    // No `size`: the bridge overrides it unconditionally. Sending one would only
+    // imply a control we do not have.
+    tools: [{ type: 'image_generation', output_format: 'png' }],
     tool_choice: { type: 'image_generation' },
     stream: true,
     store: false,

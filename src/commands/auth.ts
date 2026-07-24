@@ -41,9 +41,9 @@ function viewAuth(state: AuthState): AuthMethodView[] {
 function reachableModels(state: AuthState): { model: ModelInfo; transports: string[] }[] {
   return MODELS.map(model => {
     const transports: string[] = [];
-    if (state.codex && model.ids['codex-oauth']) transports.push('codex-oauth');
-    if (state.openRouter && model.ids['openrouter']) transports.push('openrouter');
-    if (state.gemini && model.ids['gemini-direct']) transports.push('gemini-direct');
+    if (state.codex && model.routes['codex-oauth']) transports.push('codex-oauth');
+    if (state.openRouter && model.routes['openrouter']) transports.push('openrouter');
+    if (state.gemini && model.routes['gemini-direct']) transports.push('gemini-direct');
     return { model, transports };
   }).filter(r => r.transports.length > 0);
 }

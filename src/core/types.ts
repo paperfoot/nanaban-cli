@@ -7,6 +7,8 @@ export type AspectRatio =
 
 export type ImageSize = '0.5K' | '1K' | '2K' | '4K';
 
+export type Quality = 'low' | 'medium' | 'high';
+
 export type GenerationMode = 'generate' | 'edit';
 
 export interface ImageRequest {
@@ -15,7 +17,13 @@ export interface ImageRequest {
   negativePrompt?: string;
   aspectRatio?: AspectRatio;
   imageSize?: ImageSize;
+  quality?: Quality;
   referenceImages?: ReferenceImage[];
+  /**
+   * True when the caller did not ask for a specific size, so a route with a
+   * fixed pixel budget is still an acceptable answer.
+   */
+  sizeIsImplicit?: boolean;
 }
 
 export interface ImageResult {

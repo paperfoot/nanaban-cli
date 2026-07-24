@@ -12,7 +12,10 @@ import { VERSION } from './version.js';
 
 const program = new Command();
 
-const ratiosHelp = '1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9, 1:4, 4:1, 1:8, 8:1 (aliases: square, wide, tall, ultrawide, panoramic, banner, portrait, story)';
+const ratiosHelp = '1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9 (aliases: square, wide, tall, ultrawide, portrait, landscape, story)';
+const modelHelp =
+  'model — names are flexible: `gpt`/`gpt image` → GPT Image 2, `nb`/`nano banana`/`full` → Nano Banana 2, ' +
+  '`lite` → Nano Banana 2 Lite, `pro` → Nano Banana Pro. Always resolves to the latest version of that family.';
 
 // Agents parse stdout; every failure must honor the machine contract. Detect
 // JSON intent from raw argv because parser-level errors (unknown option,
@@ -28,9 +31,12 @@ function addGenerateOptions(cmd: Command): Command {
   return cmd
     .option('-o, --output <file>', 'output file path (auto-generated from prompt if omitted)')
     .option('--ar <ratio>', `aspect ratio: ${ratiosHelp}`, '1:1')
-    .option('--size <size>', 'image size: 0.5k, 1k, 2k, 4k', '1k')
-    .option('--pro', 'use Nano Banana Pro (alias for --model nb2-pro)', false)
-    .option('--model <id>', 'model: gpt-image-2 (default when Codex auth present) | nb2 | nb2-lite | nb2-pro | gpt5 | gpt5-mini | gpt54')
+    // No default: an omitted --size means "1K is fine, free routes welcome",
+    // while an explicit --size 1k is a hard constraint. The planner needs to
+    // tell those apart to know when a fixed-budget route still qualifies.
+    .option('--size <size>', 'image size: 0.5k, 1k, 2k, 4k (omit for 1k; asking for 2k/4k routes to a provider that can deliver it)')
+    .option('--quality <level>', 'low | medium | high — explicit medium/high excludes the free Codex route, which forces low')
+    .option('--model <id>', modelHelp)
     .option('--via <transport>', 'force transport: codex-oauth, gemini-direct, openrouter')
     .option('--neg <text>', 'negative prompt (native on Gemini; appended as "Avoid: ..." elsewhere)')
     .option('-r, --ref <file...>', 'reference image path(s)')
@@ -70,9 +76,9 @@ const editCmd = new Command('edit')
   .argument('<prompt>', 'edit instructions')
   .option('-o, --output <file>', 'output file path')
   .option('--ar <ratio>', `aspect ratio (default: matches the source image): ${ratiosHelp}`)
-  .option('--size <size>', 'image size: 0.5k, 1k, 2k, 4k', '1k')
-  .option('--pro', 'use Nano Banana Pro (alias for --model nb2-pro)', false)
-  .option('--model <id>', 'model: gpt-image-2 (default when Codex auth present) | nb2 | nb2-lite | nb2-pro | gpt5 | gpt5-mini | gpt54')
+  .option('--size <size>', 'image size: 0.5k, 1k, 2k, 4k (omit for 1k)')
+  .option('--quality <level>', 'low | medium | high')
+  .option('--model <id>', modelHelp)
   .option('--via <transport>', 'force transport: codex-oauth, gemini-direct, openrouter')
   .option('--neg <text>', 'negative prompt (native on Gemini; appended as "Avoid: ..." elsewhere)')
   .option('--json', 'JSON output', false)
@@ -87,7 +93,7 @@ const upscaleCmd = new Command('upscale')
   .argument('<image>', 'path to the image to upscale')
   .option('--scale <factor>', 'upscale factor: 2 or 4', '2')
   .option('--engine <engine>', 'auto | real-esrgan (Replicate) | crisp (Recraft) | rerender (generative)', 'auto')
-  .option('--model <id>', 'model for --engine rerender (default: nb2-pro)')
+  .option('--model <id>', 'model for --engine rerender (default: nb2)')
   .option('--face-enhance', 'enable GFPGAN face enhancement (real-esrgan only; can alter identity)', false)
   .option('-o, --output <file>', 'output file path')
   .option('--json', 'JSON output', false)

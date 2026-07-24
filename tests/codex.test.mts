@@ -62,7 +62,7 @@ describe('transport-codex-oauth', () => {
     assert.equal(res.buffer.toString('base64'), TINY_PNG_B64);
   });
 
-  it('requests 1024x1536 for 2:3 / 1536x1024 for 3:2 and injects a prompt aspect hint', async () => {
+  it('sends no size (the bridge overrides it) and steers aspect through the prompt', async () => {
     const events = [JSON.stringify({
       type: 'response.output_item.done',
       item: { type: 'image_generation_call', result: TINY_PNG_B64 },
@@ -78,9 +78,10 @@ describe('transport-codex-oauth', () => {
       'gpt-image-2',
       { mode: 'generate', prompt: 'x', aspectRatio: '2:3' },
     );
-    assert.equal(capturedBody.tools[0].size, '1024x1536');
-    // The bridge ignores tools[].size, so the aspect must also be steered
-    // through the prompt (live-verified to work).
+    // Live-verified 2026-07-23: the bridge substitutes its own size for every
+    // value we send, so sending one implies a control we do not have.
+    assert.equal(capturedBody.tools[0].size, undefined, 'must not send a size the bridge ignores');
+    // Prompt steering is the only frame control that actually works here.
     assert.match(capturedBody.input[0].content.at(-1).text, /2:3 aspect ratio.*portrait/);
 
     await generateViaCodexOAuth(
@@ -88,7 +89,7 @@ describe('transport-codex-oauth', () => {
       'gpt-image-2',
       { mode: 'generate', prompt: 'x', aspectRatio: '3:2' },
     );
-    assert.equal(capturedBody.tools[0].size, '1536x1024');
+    assert.equal(capturedBody.tools[0].size, undefined);
     assert.match(capturedBody.input[0].content.at(-1).text, /3:2 aspect ratio.*landscape/);
   });
 
@@ -149,19 +150,28 @@ describe('transport-codex-oauth', () => {
     assert.equal(content[1].type, 'input_text');
   });
 
-  it('throws CAPABILITY_UNSUPPORTED for aspect ratios outside {1:1, 2:3, 3:2}', async () => {
-    let called = false;
-    globalThis.fetch = (async () => { called = true; return new Response(''); }) as FetchFn;
+  it('accepts 16:9 and steers it through the prompt (v5 wrongly rejected it)', async () => {
+    // v5 refused every ratio outside {1:1, 2:3, 3:2} before hitting the network.
+    // That limit was a GPT Image 1-era fiction: the bridge happily returns 16:9
+    // when the prompt asks for it (live-verified — 1672x941). Agents planned
+    // elaborate crop/upscale workarounds around a constraint that never existed.
+    const events = [JSON.stringify({
+      type: 'response.output_item.done',
+      item: { type: 'image_generation_call', result: TINY_PNG_B64 },
+    })];
+    let capturedBody: any = null;
+    globalThis.fetch = (async (_url: any, init: any) => {
+      capturedBody = JSON.parse(init.body);
+      return new Response(sseStream(events), { status: 200 });
+    }) as FetchFn;
 
-    await assert.rejects(
-      () => generateViaCodexOAuth(
-        { accessToken: 't', accountId: 'a' },
-        'gpt-image-2',
-        { mode: 'generate', prompt: 'x', aspectRatio: '16:9' },
-      ),
-      (err: any) => err.code === 'CAPABILITY_UNSUPPORTED',
+    const res = await generateViaCodexOAuth(
+      { accessToken: 't', accountId: 'a' },
+      'gpt-image-2',
+      { mode: 'generate', prompt: 'x', aspectRatio: '16:9' },
     );
-    assert.equal(called, false, 'must reject before hitting the network');
+    assert.equal(res.transport, 'codex-oauth');
+    assert.match(capturedBody.input[0].content.at(-1).text, /16:9 aspect ratio.*landscape/);
   });
 
   it('maps 401 → AUTH_INVALID with `codex login` hint', async () => {

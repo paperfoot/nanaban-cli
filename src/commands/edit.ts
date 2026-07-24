@@ -10,8 +10,8 @@ export interface EditCommandOpts {
   output?: string;
   /** No default: undefined means "match the source image's aspect ratio". */
   ar?: string;
-  size: string;
-  pro: boolean;
+  size?: string;
+  quality?: string;
   model?: string;
   via?: string;
   neg?: string;
@@ -40,7 +40,7 @@ export async function runEdit(imagePath: string, prompt: string, opts: EditComma
       mode: 'edit',
       prompt,
       modelName: opts.model,
-      pro: opts.pro,
+      quality: opts.quality,
       via: opts.via,
       aspect: opts.ar,
       size: opts.size,

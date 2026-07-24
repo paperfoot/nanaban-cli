@@ -6,8 +6,8 @@ import { normalizeError } from '../lib/errors.js';
 export interface GenerateCommandOpts {
   output?: string;
   ar?: string;
-  size: string;
-  pro: boolean;
+  size?: string;
+  quality?: string;
   model?: string;
   via?: string;
   neg?: string;
@@ -42,6 +42,9 @@ export async function reportSuccess(
     durationMs: result.durationMs,
     costUsd: result.costUsd,
     fallbacks: result.fallbacks,
+    aspectFulfillment: result.aspectFulfillment,
+    costEstimated: result.costEstimated,
+    warnings: result.warnings?.length ? result.warnings : undefined,
     ...extra,
   });
 }
@@ -56,7 +59,7 @@ export async function runGenerate(prompt: string, opts: GenerateCommandOpts): Pr
       mode: 'generate',
       prompt,
       modelName: opts.model,
-      pro: opts.pro,
+      quality: opts.quality,
       via: opts.via,
       aspect: opts.ar,
       size: opts.size,

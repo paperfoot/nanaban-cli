@@ -23,6 +23,13 @@ export interface GenerateResult {
   durationMs: number;
   costUsd?: number;
   fallbacks?: FallbackHop[];
+  /**
+   * "exact" when the route has real aspect/size parameters; "approximate" when
+   * the frame could only be steered through prompt prose (the Codex bridge).
+   */
+  aspectFulfillment?: 'exact' | 'approximate';
+  /** True when cost_usd is a route estimate, not a figure the provider returned. */
+  costEstimated?: boolean;
   /** Present on upscale results. */
   operation?: string;
   method?: string;
@@ -121,6 +128,8 @@ export class JsonOutput implements Output {
     if (r.providerModel && r.providerModel !== r.model) out.provider_model = r.providerModel;
     if (r.mimeType) out.mime_type = r.mimeType;
     if (r.costUsd !== undefined) out.cost_usd = r.costUsd;
+    if (r.aspectFulfillment) out.aspect_fulfillment = r.aspectFulfillment;
+    if (r.costEstimated) out.cost_is_estimate = true;
     if (r.fallbacks?.length) out.fallbacks = r.fallbacks;
     if (r.operation) out.operation = r.operation;
     if (r.method) out.method = r.method;
