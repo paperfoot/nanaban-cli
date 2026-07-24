@@ -20,9 +20,9 @@ const RECOVERY: Record<ErrorCode, string> = {
   RATE_LIMITED: 'Wait and retry. On gpt-image-2 via codex-oauth this means the ChatGPT Plus/Pro image quota is saturated — wait for the window to reset, or configure OPENROUTER_API_KEY so nanaban can fall back to a metered transport automatically (this spends money; the fallbacks array discloses it).',
   NETWORK_ERROR: 'Retry. nanaban also auto-falls-back to the next available transport on the same invocation.',
   TIMEOUT: 'The provider did not answer within the deadline (default 240s). Retry; raise NANABAN_TIMEOUT_MS for very large generations.',
-  MODEL_NOT_FOUND: 'Run `nanaban agent-info` and pick from the `models` array. Canonical ids: gpt-image-2, nb2, nb2-lite, nb2-pro, gpt5, gpt5-mini, gpt54.',
-  TRANSPORT_UNAVAILABLE: 'The forced transport cannot reach the requested model with current auth. Drop `--via`, or switch to a model this transport reaches (see `transport_ids`).',
-  CAPABILITY_UNSUPPORTED: 'Check the model\'s `capabilities` in `nanaban agent-info`. With no explicit --model, nanaban auto-picks a model that supports the requested aspect/size.',
+  MODEL_NOT_FOUND: 'Run `nanaban agent-info` and pick from the `models` array. Canonical ids: gpt-image-2, nb2, nb-pro, nb-lite. Family aliases also work and always resolve to the latest model: `gpt`, `nano banana`, `full`, `lite`, `pro`.',
+  TRANSPORT_UNAVAILABLE: 'The forced transport cannot reach the requested model with current auth. Drop `--via`, or switch to a model this transport reaches (see each model\'s `routes` array).',
+  CAPABILITY_UNSUPPORTED: 'Check the per-route capabilities in `nanaban agent-info` (`models[].routes`), not per-model — the same model differs by transport. With no explicit --model, nanaban already picks a route that can satisfy the requested aspect/size/quality, so this code means NO configured route can. The message lists what was rejected and why.',
   OUTPUT_UNWRITABLE: 'The image WAS generated but could not be written to the requested location; the error message names the salvage path in the OS temp dir. Move it from there — do NOT re-run (that pays for a second generation).',
 };
 
@@ -41,7 +41,7 @@ const DESCRIPTION: Record<ErrorCode, string> = {
   TIMEOUT: 'Provider exceeded the request deadline (NANABAN_TIMEOUT_MS, default 240000)',
   MODEL_NOT_FOUND: 'Unknown model id',
   TRANSPORT_UNAVAILABLE: 'Forced transport cannot reach the requested model',
-  CAPABILITY_UNSUPPORTED: 'Model does not support the requested aspect ratio, size, or operation',
+  CAPABILITY_UNSUPPORTED: 'No route can serve the requested aspect ratio, size, quality, or operation',
   OUTPUT_UNWRITABLE: 'Generated image could not be written to the requested output location',
 };
 
@@ -49,7 +49,7 @@ export function runAgentInfo(): void {
   const manifest = {
     name: 'nanaban',
     version: VERSION,
-    schema_version: '2.0',
+    schema_version: '3.0',
     description: 'Image generation, editing, and upscaling from the terminal — GPT Image 2, Nano Banana 2/Lite/Pro (Gemini), GPT-5.x Image, plus Real-ESRGAN/Recraft super-resolution, via one CLI. nanaban is the router CLI, not a model — Nano Banana is one of the model families it serves.',
     transports: [
       {
@@ -57,7 +57,7 @@ export function runAgentInfo(): void {
         description: "ChatGPT Plus/Pro backend (Codex) using the user's access token",
         auth_file: '~/.codex/auth.json',
         billing_mode: 'subscription_quota',
-        disclosure: 'This is a reverse-engineered bridge to an experimental ChatGPT backend, not a supported OpenAI API. Image generations count against the ChatGPT subscription\'s image quota (shared with chatgpt.com usage). OpenAI could change or gate it at any time; if it breaks, use `--via openrouter` or a Gemini model. The bridge picks its own output size (~1254px square observed) — nanaban steers aspect ratio through the prompt and always reports measured dimensions.',
+        disclosure: 'This is a reverse-engineered bridge to an experimental ChatGPT backend, not a supported OpenAI API. Image generations count against the ChatGPT subscription\'s image quota (shared with chatgpt.com usage). OpenAI could change or gate it at any time; if it breaks, use `--via openrouter` or a Gemini model. HARD CEILING (live-verified 2026-07-23): the bridge ignores the size parameter and always returns ~1.57 megapixels, and forces quality=low. It cannot produce 2K or 4K by any means, so nanaban excludes it from those requests before making a network call. Aspect ratio is steered through the prompt — approximate, not exact — and dimensions are always measured from the returned bytes, never assumed.',
       },
       {
         id: 'gemini-direct',
@@ -69,7 +69,7 @@ export function runAgentInfo(): void {
       },
       {
         id: 'openrouter',
-        description: 'OpenRouter chat completions endpoint — one key reaches every OR-routed model, including openai/gpt-image-2 as a metered fallback for the default model',
+        description: 'OpenRouter chat completions endpoint — one key reaches every OR-routed model. Note: openai/gpt-image-2 is listed in OpenRouter\'s catalog but has NO image endpoint (404s); the working path to the GPT Image 2 stack here is openai/gpt-5.4-image-2. Gemini 4K is served only by the -preview provider ids.',
         env_keys: ['OPENROUTER_API_KEY'],
         config_key: 'openRouterKey',
         endpoint: 'https://openrouter.ai/api/v1/chat/completions',
@@ -126,7 +126,7 @@ export function runAgentInfo(): void {
             method: 'generative_rerender',
             content_preservation: 'not_preserved',
             warning: 'Re-synthesizes every pixel at 2K/4K — content can drift. Never silently substituted for super-resolution: the envelope labels method and carries a warning.',
-            default_model: 'nb2-pro',
+            default_model: 'nb2',
             requires: 'any generation auth (works with zero upscaler keys)',
           },
         ],
@@ -138,25 +138,68 @@ export function runAgentInfo(): void {
       display: m.display,
       family: m.family,
       aliases: m.aliases,
-      transport_ids: m.ids,
-      capabilities: {
-        aspect_ratios: m.caps.aspectRatios,
-        sizes: m.caps.sizes,
-        max_reference_images: m.caps.maxRefImages,
-        supports_edit: m.caps.edit,
-        negative_prompt_mode: m.caps.negativePrompt ? 'native' : 'prompt_emulated',
-      },
-      est_cost_per_image_usd: m.costPerImageUsd,
-      ...(m.deprecated ? { deprecated: true } : {}),
+      alias_policy: 'Family names resolve version-agnostically to the CURRENT model — `gpt` is always the latest GPT image model, never a retired one. Matching ignores case, spaces, and punctuation, so "GPT Image", "gpt-image" and "gptimage" are the same.',
+      // Capabilities live on ROUTES, never on the model: the same model behaves
+      // differently per transport, and publishing one flat set is what made
+      // agents plan around limits that did not exist on the route they used.
+      routes: Object.entries(m.routes).map(([transport, c]) => ({
+        route_id: `${m.id}/${transport}`,
+        transport,
+        provider_model: c.providerModel,
+        ...(c.providerModelBySize ? { provider_model_by_size: c.providerModelBySize } : {}),
+        lifecycle: c.lifecycle,
+        billing: c.billing,
+        est_cost_per_image_usd: c.costPerImageUsd,
+        aspect_ratios: c.aspectRatios,
+        aspect_control: c.aspectExact ? 'exact_parameter' : 'prompt_steered_approximate',
+        sizes: c.sizes,
+        resolution_control: c.fixedPixelBudget
+          ? {
+              mode: 'fixed_pixel_budget',
+              approx_megapixels: Number((c.fixedPixelBudget / 1e6).toFixed(2)),
+              size_parameter_ignored: true,
+              supports_2k: false,
+              supports_4k: false,
+            }
+          : { mode: 'native_tiers', size_parameter_honored: true },
+        quality: c.forcedQuality
+          ? { mode: 'forced', effective: c.forcedQuality }
+          : c.quality
+            ? { mode: 'selectable', values: c.quality }
+            : { mode: 'model_defined' },
+        max_reference_images: c.maxRefImages,
+        supports_edit: c.edit,
+        output_format: m.family === 'gemini' ? 'image/jpeg (Gemini emits JPEG only)' : 'image/png',
+        ...(c.notes ? { notes: c.notes } : {}),
+      })),
       ...(m.notes ? { notes: m.notes } : {}),
     })),
-    pricing_note: 'est_cost_per_image_usd is the 1K estimate; Gemini pricing scales with output size (e.g. nb2-pro ~$0.24 at 4K). codex-oauth routes report cost_usd: 0 because they debit the ChatGPT subscription quota, not a metered balance. OpenRouter routes report actual metered cost in the envelope when available.',
+    routing: {
+      explicit_size_is_hard_constraint: true,
+      explicit_quality_is_hard_constraint: true,
+      unpinned_model_may_change_to_satisfy_request: true,
+      pinned_model_never_silently_changes: true,
+      codex_is_never_used_for_2k_or_4k: true,
+      note: '--size/--quality SELECT the route. Asking for 2k/4k without --model picks a provider that can actually deliver it rather than failing the default. Omitting --size leaves the free Codex route eligible.',
+    },
+    verified: {
+      date: '2026-07-23',
+      method: 'live probes against each provider',
+      findings: [
+        'codex-oauth ignores tools[].size in all 6 tested configurations and returns ~1.57MP (1254x1254) with quality forced to low.',
+        'openai/gpt-image-2 on OpenRouter has no image endpoint (404); openai/gpt-5.4-image-2 is the working OpenRouter path.',
+        'OpenRouter serves Gemini 4K only from -preview provider ids; stable ids reject it.',
+        'Nano Banana Pro on OpenRouter returns 1376x768 at every requested size while billing the full price — that route is not offered.',
+        'Gemini returns JPEG only; no API accepts image/png.',
+      ],
+    },
+    pricing_note: 'Costs live on routes, not models: est_cost_per_image_usd is the 1K estimate and Gemini pricing scales with output size (nb-pro is ~$0.24 at 4K). Routes with billing: subscription_quota report cost_usd: 0 because they debit the ChatGPT subscription, not a metered balance. OpenRouter routes report actual metered cost in the envelope when available.',
     auth_resolution: {
       policy: 'Pick the first available transport in preference order. On a transient failure automatically retry on the next available transport. --via <transport> pins a single route and disables fallback. Any single key or auth file is enough — you do not need all of them. An expired Codex token (JWT exp in the past) is treated as unavailable for auto-selection.',
       preference_order: TRANSPORT_PREFERENCE,
-      preference_rationale: 'codex-oauth first because it is $0 for ChatGPT Plus/Pro subscribers. OpenRouter second (one key, every model — metered). gemini-direct third for direct Google API users.',
+      preference_rationale: 'gemini-direct first: it is the only route that delivers true 4K and exact sizes for the Gemini models (OpenRouter caps them and silently downgrades Pro). codex-oauth second because it is $0 for ChatGPT Plus/Pro subscribers, but it is excluded up front for any request it cannot satisfy. OpenRouter last as the universal metered fallback.',
       override_flag: '--via <transport>',
-      model_auto_selection: 'With no --model: gpt-image-2 when usable Codex auth exists AND it supports the requested aspect/size; otherwise nb2. `--ar wide` or `--size 2k` therefore auto-picks nb2 even on Codex machines.',
+      model_auto_selection: 'With no --model, the requested size/aspect/quality select the route. Every model+transport pair that can satisfy the request is ranked: exact aspect and true resolution outrank a fixed-budget route, then free outranks metered, then cheaper wins. So a plain 1K request uses the free Codex route where available, and --size 2k/4k automatically moves to a provider that can actually deliver it instead of erroring.',
       fallback_behavior: {
         enabled: true,
         disabled_when: '--via <transport> is set',
@@ -177,8 +220,8 @@ export function runAgentInfo(): void {
           { name: '--output', short: '-o', type: 'string', description: 'Output file path (auto-generated from prompt if omitted; extension follows actual MIME type)' },
           { name: '--ar', type: 'string', default: '1:1', description: 'Aspect ratio (see model capabilities; aliases: square, wide, tall, ultrawide, panoramic, banner, portrait, story)' },
           { name: '--size', type: 'string', default: '1k', description: 'Resolution: 0.5k, 1k, 2k, 4k (model-dependent)' },
-          { name: '--pro', type: 'boolean', default: false, description: 'Alias for --model nb2-pro (Nano Banana Pro)' },
-          { name: '--model', type: 'string', default: 'auto (see auth_resolution.model_auto_selection)', description: 'Model id: gpt-image-2 | nb2 | nb2-lite | nb2-pro | gpt5 | gpt5-mini | gpt54 (aliases: gi2, pro, flash, lite, gpt, mini)' },
+          { name: '--quality', type: 'string', default: 'unset (model default)', description: 'low | medium | high. Explicit medium/high excludes the codex-oauth route, which forces low.' },
+          { name: '--model', type: 'string', default: 'auto (see auth_resolution.model_auto_selection)', description: 'gpt-image-2 | nb2 | nb-pro | nb-lite. Names are matched ignoring case, spaces and punctuation, and family names always resolve to the latest model: `gpt`/`gpt image` → GPT Image 2, `nb`/`nano banana`/`full` → Nano Banana 2, `lite` → Nano Banana 2 Lite, `pro` → Nano Banana Pro.' },
           { name: '--via', type: 'string', description: 'Force transport: codex-oauth | gemini-direct | openrouter (aliases: codex, plus, gemini, google, or)' },
           { name: '--neg', type: 'string', description: 'Negative prompt — native on Gemini models, appended as "Avoid: ..." prompt text elsewhere' },
           { name: '--ref', short: '-r', type: 'string[]', description: 'Reference image path(s); max 20MB each (NANABAN_MAX_REF_BYTES)' },
@@ -198,7 +241,7 @@ export function runAgentInfo(): void {
         flags: [
           { name: '--ar', type: 'string', default: 'auto (source aspect)', description: 'Override the inferred aspect ratio' },
           { name: '--size', type: 'string', default: '1k', description: 'Resolution: 0.5k, 1k, 2k, 4k (model-dependent)' },
-          { name: '--model / --pro / --via / --neg / -o / --open / --json / --quiet', type: 'mixed', description: 'Same semantics as generate' },
+          { name: '--model / --quality / --via / --neg / -o / --open / --json / --quiet', type: 'mixed', description: 'Same semantics as generate' },
         ],
       },
       {
@@ -209,7 +252,7 @@ export function runAgentInfo(): void {
         flags: [
           { name: '--scale', type: 'number', default: 2, description: '2 or 4' },
           { name: '--engine', type: 'string', default: 'auto', description: 'auto | real-esrgan | crisp | rerender (see operations.upscale)' },
-          { name: '--model', type: 'string', default: 'nb2-pro', description: 'Generation model for --engine rerender' },
+          { name: '--model', type: 'string', default: 'nb2', description: 'Generation model for --engine rerender' },
           { name: '--face-enhance', type: 'boolean', default: false, description: 'GFPGAN face enhancement (real-esrgan only; can alter identity)' },
           { name: '-o / --open / --json / --quiet', type: 'mixed', description: 'Same semantics as generate' },
         ],

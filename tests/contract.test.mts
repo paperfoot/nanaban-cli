@@ -64,23 +64,86 @@ describe('agent-info', () => {
     }
   });
 
-  it('declares all seven models with capabilities', () => {
+  it('declares every model with per-route capabilities', () => {
     const { stdout } = run(['agent-info']);
     const manifest = JSON.parse(stdout);
     assert.ok(Array.isArray(manifest.models));
     const ids = manifest.models.map((m: any) => m.id);
-    for (const expected of ['nb2', 'nb2-lite', 'nb2-pro', 'gpt5', 'gpt5-mini', 'gpt54', 'gpt-image-2']) {
+    for (const expected of ['gpt-image-2', 'nb2', 'nb-pro', 'nb-lite']) {
       assert.ok(ids.includes(expected), `missing model: ${expected}`);
     }
+    // The GPT Image 1-era models are gone, not merely flagged: leaving them
+    // reachable is how `--model gpt` used to land on a retired stack.
+    for (const gone of ['gpt5', 'gpt5-mini', 'gpt54', 'nb2-pro', 'nb2-lite']) {
+      assert.ok(!ids.includes(gone), `retired model still declared: ${gone}`);
+    }
+
+    const byRoute = (id: string, t: string) =>
+      manifest.models.find((m: any) => m.id === id).routes.find((r: any) => r.transport === t);
+
+    // Capabilities are per route, never flat on the model.
+    for (const m of manifest.models) {
+      assert.ok(Array.isArray(m.routes) && m.routes.length > 0, `${m.id} must declare routes`);
+      assert.equal(m.capabilities, undefined, `${m.id} must not declare flat capabilities`);
+    }
+
+    // The free Codex route must disclose its real ceiling, and must NOT claim
+    // 2K/4K — an agent reading this should never plan a 4K job through it.
+    const codex = byRoute('gpt-image-2', 'codex-oauth');
+    assert.equal(codex.resolution_control.mode, 'fixed_pixel_budget');
+    assert.equal(codex.resolution_control.supports_4k, false);
+    assert.equal(codex.quality.mode, 'forced');
+    assert.equal(codex.quality.effective, 'low');
+    assert.equal(codex.aspect_control, 'prompt_steered_approximate');
+    // ...but it must still advertise 16:9, which v5 wrongly refused.
+    assert.ok(codex.aspect_ratios.includes('16:9'));
+
+    // OpenRouter's openai/gpt-image-2 has no image endpoint — it must never
+    // appear as a provider model anywhere in the manifest.
+    assert.ok(!JSON.stringify(manifest).includes('"openai/gpt-image-2"'));
+
+    // 4K on OpenRouter is served only by the -preview provider ids.
+    const nb2or = byRoute('nb2', 'openrouter');
+    assert.ok(nb2or.sizes.includes('4K'));
+    assert.match(nb2or.provider_model_by_size['4K'], /preview/);
+    assert.ok(!nb2or.provider_model.includes('preview'), 'non-4K sizes use the stable id');
+
+    const nb2direct = byRoute('nb2', 'gemini-direct');
+    assert.ok(nb2direct.sizes.includes('0.5K') && nb2direct.sizes.includes('4K'));
+
+    // Pro is deliberately gemini-direct only: OpenRouter silently downgrades it
+    // to 1376x768 while billing the full price.
+    const pro = manifest.models.find((m: any) => m.id === 'nb-pro');
+    assert.deepEqual(pro.routes.map((r: any) => r.transport), ['gemini-direct']);
+
+    // Lite takes reference images — v5 declared 0 and refused edits outright.
+    const lite = byRoute('nb-lite', 'gemini-direct');
+    assert.deepEqual(lite.sizes, ['1K'], 'lite is 1K-only per Gemini API docs');
+    assert.equal(lite.max_reference_images, 14);
+    assert.equal(lite.supports_edit, true);
+  });
+
+  it('resolves family aliases to the current model, never a retired one', () => {
+    const { stdout } = run(['agent-info']);
+    const manifest = JSON.parse(stdout);
+    const gpt = manifest.models.find((m: any) => m.id === 'gpt-image-2');
+    // `gpt` and `mini` used to resolve to GPT-5 Image / GPT-5 Image Mini, both
+    // built on the retiring GPT Image 1 stack.
+    for (const a of ['gpt', 'gpt5', 'mini', 'openai']) {
+      assert.ok(gpt.aliases.includes(a), `\`${a}\` must resolve to the current GPT image model`);
+    }
     const nb2 = manifest.models.find((m: any) => m.id === 'nb2');
-    assert.ok(nb2.capabilities.aspect_ratios.includes('1:8'), 'nb2 should support extended ratios');
-    assert.ok(nb2.capabilities.sizes.includes('0.5K'), 'nb2 should support 0.5K');
-    assert.ok(!nb2.transport_ids['gemini-direct'].includes('preview'), 'nb2 should use stable (non-preview) model id');
-    const pro = manifest.models.find((m: any) => m.id === 'nb2-pro');
-    assert.ok(!pro.capabilities.aspect_ratios.includes('1:8'), 'pro should not have extended ratios');
-    const lite = manifest.models.find((m: any) => m.id === 'nb2-lite');
-    assert.deepEqual(lite.capabilities.sizes, ['1K'], 'lite is 1K-only per Gemini API docs');
-    assert.ok(!lite.capabilities.aspect_ratios.includes('1:8'), 'lite should not have extended ratios');
+    for (const a of ['nb', 'nanobanana', 'full', 'flash']) {
+      assert.ok(nb2.aliases.includes(a), `\`${a}\` must resolve to the current Nano Banana`);
+    }
+  });
+
+  it('the embedded skill matches SKILL.md exactly', async () => {
+    // SKILL.md is what humans edit; SKILL_CONTENT is what `nanaban skill install`
+    // writes. They were hand-duplicated and had already drifted — pin them.
+    const { SKILL_CONTENT } = await import('../src/commands/skill.ts');
+    const onDisk = readFileSync(new URL('../SKILL.md', import.meta.url), 'utf8');
+    assert.equal(SKILL_CONTENT, onDisk, 'run `node scripts/sync-skill.mjs` after editing SKILL.md');
   });
 
   it('auth declares the --check live probe', () => {
