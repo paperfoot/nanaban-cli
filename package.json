@@ -1,6 +1,6 @@
 {
   "name": "nanaban",
-  "version": "6.0.0",
+  "version": "7.0.0",
   "type": "module",
   "description": "Image generation from the terminal — GPT Image 2 (free on ChatGPT Plus/Pro via Codex OAuth) and Nano Banana 2/Lite/Pro (Gemini) with true 4K, routed through one CLI.",
   "bin": {

@@ -67,9 +67,9 @@ async function rerenderUpscale(
   input: { width: number; height: number },
   warnings: string[],
 ): Promise<UpscaleOutcome> {
-  // Default to nb2, not nb-pro: Pro needs a Gemini key (its OpenRouter route
-  // silently downgrades), so defaulting to it made the no-key fallback path fail
-  // outright. nb2 reaches 4K on both gemini-direct and OpenRouter.
+  // nb2 reaches 4K on both gemini-direct and OpenRouter. The old default was
+  // nb2-pro, which needed a Gemini key and whose OpenRouter route silently
+  // downgraded — so the no-key fallback path failed outright.
   const modelName = opts.modelName ?? 'nb2';
   const model = resolveModel(modelName);
   if (!model) throw new NB2Error('MODEL_NOT_FOUND', `Unknown rerender model "${modelName}"`);

@@ -15,7 +15,7 @@ const program = new Command();
 const ratiosHelp = '1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9 (aliases: square, wide, tall, ultrawide, portrait, landscape, story)';
 const modelHelp =
   'model — names are flexible: `gpt`/`gpt image` → GPT Image 2, `nb`/`nano banana`/`full` → Nano Banana 2, ' +
-  '`lite` → Nano Banana 2 Lite, `pro` → Nano Banana Pro. Always resolves to the latest version of that family.';
+  '`lite` → Nano Banana 2 Lite. A family name always resolves to the newest model in it, so `pro` also lands on the current best Nano Banana.';
 
 // Agents parse stdout; every failure must honor the machine contract. Detect
 // JSON intent from raw argv because parser-level errors (unknown option,

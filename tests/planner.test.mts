@@ -35,8 +35,12 @@ describe('model name resolution', () => {
     for (const n of ['gpt', 'gpt5', 'gpt-5-image', 'mini', 'gpt54', 'openai', 'chatgpt']) {
       assert.equal(resolveModel(n)?.id, 'gpt-image-2', `"${n}" must resolve forward, not to a retired model`);
     }
-    // Old canonical ids keep working but point at the current equivalents.
-    assert.equal(resolveModel('nb2-pro')?.id, 'nb-pro');
+    // Nano Banana Pro is Gemini 3 Pro Image — a generation behind nb2's Gemini
+    // 3.1 — so it was removed. `pro` means "the best current Nano Banana" and
+    // must resolve forward rather than 404 or pin an old model.
+    for (const n of ['pro', 'nb-pro', 'nb2-pro', 'nano banana pro']) {
+      assert.equal(resolveModel(n)?.id, 'nb2', `"${n}" must resolve to the current best model`);
+    }
     assert.equal(resolveModel('nb2-lite')?.id, 'nb-lite');
   });
 
@@ -126,8 +130,18 @@ describe('provider model selection', () => {
     }
   });
 
-  it('offers Pro only on gemini-direct', () => {
-    // OpenRouter pins Pro to 1376x768 at every size while charging full price.
-    assert.deepEqual(Object.keys(resolveModel('pro')!.routes), ['gemini-direct']);
+  it('ships no model from a superseded generation', () => {
+    // Policy: never keep an old model reachable. Every Gemini route must be on
+    // the current 3.1 generation — gemini-3-pro-image (Nano Banana Pro, Nov
+    // 2025) and gemini-2.5-flash-image are a generation behind and are gone.
+    for (const m of MODELS) {
+      for (const c of Object.values(m.routes)) {
+        const ids = [c.providerModel, ...Object.values(c.providerModelBySize ?? {})];
+        for (const id of ids) {
+          assert.ok(!id.includes('gemini-3-pro-image'), `${m.id} still routes to Nano Banana Pro: ${id}`);
+          assert.ok(!id.includes('gemini-2.5'), `${m.id} still routes to a 2.5-era model: ${id}`);
+        }
+      }
+    }
   });
 });

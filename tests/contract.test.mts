@@ -69,12 +69,12 @@ describe('agent-info', () => {
     const manifest = JSON.parse(stdout);
     assert.ok(Array.isArray(manifest.models));
     const ids = manifest.models.map((m: any) => m.id);
-    for (const expected of ['gpt-image-2', 'nb2', 'nb-pro', 'nb-lite']) {
+    for (const expected of ['gpt-image-2', 'nb2', 'nb-lite']) {
       assert.ok(ids.includes(expected), `missing model: ${expected}`);
     }
     // The GPT Image 1-era models are gone, not merely flagged: leaving them
     // reachable is how `--model gpt` used to land on a retired stack.
-    for (const gone of ['gpt5', 'gpt5-mini', 'gpt54', 'nb2-pro', 'nb2-lite']) {
+    for (const gone of ['gpt5', 'gpt5-mini', 'gpt54', 'nb-pro', 'nb2-pro', 'nb2-lite']) {
       assert.ok(!ids.includes(gone), `retired model still declared: ${gone}`);
     }
 
@@ -98,10 +98,6 @@ describe('agent-info', () => {
     // ...but it must still advertise 16:9, which v5 wrongly refused.
     assert.ok(codex.aspect_ratios.includes('16:9'));
 
-    // OpenRouter's openai/gpt-image-2 has no image endpoint — it must never
-    // appear as a provider model anywhere in the manifest.
-    assert.ok(!JSON.stringify(manifest).includes('"openai/gpt-image-2"'));
-
     // 4K on OpenRouter is served only by the -preview provider ids.
     const nb2or = byRoute('nb2', 'openrouter');
     assert.ok(nb2or.sizes.includes('4K'));
@@ -111,10 +107,17 @@ describe('agent-info', () => {
     const nb2direct = byRoute('nb2', 'gemini-direct');
     assert.ok(nb2direct.sizes.includes('0.5K') && nb2direct.sizes.includes('4K'));
 
-    // Pro is deliberately gemini-direct only: OpenRouter silently downgrades it
-    // to 1376x768 while billing the full price.
-    const pro = manifest.models.find((m: any) => m.id === 'nb-pro');
-    assert.deepEqual(pro.routes.map((r: any) => r.transport), ['gemini-direct']);
+    // No superseded generation is REACHABLE. Checked against provider ids
+    // specifically, not the whole blob — prose may legitimately name a removed
+    // model to explain why it is gone.
+    const providerIds = manifest.models.flatMap((m: any) =>
+      m.routes.flatMap((r: any) => [r.provider_model, ...Object.values(r.provider_model_by_size ?? {})]),
+    );
+    for (const id of providerIds) {
+      assert.ok(!id.includes('gemini-3-pro-image'), `Nano Banana Pro still reachable: ${id}`);
+      assert.ok(!id.includes('gemini-2.5'), `2.5-era model still reachable: ${id}`);
+      assert.notEqual(id, 'openai/gpt-image-2');
+    }
 
     // Lite takes reference images — v5 declared 0 and refused edits outright.
     const lite = byRoute('nb-lite', 'gemini-direct');

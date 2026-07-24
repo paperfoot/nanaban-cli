@@ -144,7 +144,6 @@ You only need **one** path configured. nanaban detects what's available and rout
 | `gpt-image-2` | OpenAI GPT Image 2 | Strong text, high fidelity, PNG output | ~1.57 MP free via Codex; 2K metered | **$0** on ChatGPT Plus/Pro |
 | `nb2` | Gemini Nano Banana 2 | The workhorse — fast, cheap, true 4K | 4K (5504×3072 at 16:9) | $0.067 |
 | `nb-lite` | Gemini Nano Banana 2 Lite | Fastest + cheapest, high-volume drafts (~3s/image) | 1K | $0.034 |
-| `nb-pro` | Gemini Nano Banana Pro | Highest quality detail. Needs a Gemini key. | 4K | $0.134 (~$0.24 at 4K) |
 
 All models accept the ten standard aspect ratios (`1:1 2:3 3:2 3:4 4:3 4:5 5:4 9:16 16:9 21:9`).
 Capabilities differ **per route**, not per model — run `nanaban agent-info` for the exact matrix.
@@ -159,7 +158,7 @@ resolves to the **newest** model in that family — so you never have to track v
 | `gpt`, `gpt image`, `openai`, `chatgpt` | GPT Image 2 |
 | `nb`, `nano banana`, `full`, `flash` | Nano Banana 2 |
 | `lite` | Nano Banana 2 Lite |
-| `pro` | Nano Banana Pro |
+| `pro` | Nano Banana 2 (no current Pro tier — see below) |
 
 Costs are typical per-image rates via the standard paid API path. **gpt-image-2 is free** when routed through Codex OAuth because it decrements your ChatGPT Plus/Pro image quota rather than an API balance.
 
@@ -171,10 +170,11 @@ This is the one thing worth reading twice.
   ignores the size parameter entirely (verified across six configurations), and its aspect
   ratio is steered through the prompt, so the frame is approximate. It cannot produce 2K or
   4K by any means — nanaban excludes it from those requests before making a network call.
-- **True 4K needs a Gemini key** (`nb2` or `nb-pro` on `gemini-direct`), or OpenRouter, where
+- **True 4K** comes from `nb2` — on `gemini-direct` with a Gemini key, or on OpenRouter, where
   4K is served only by the `-preview` provider ids that nanaban selects automatically.
-- **Nano Banana Pro is offered on `gemini-direct` only.** Through OpenRouter it returns
-  1376×768 at every requested size while billing the full price, so that route is not exposed.
+- **There is no Pro model.** Nano Banana Pro is Gemini 3 Pro Image — a full generation behind
+  `nb2`'s Gemini 3.1 — so it was removed in v7. `--model pro` resolves to `nb2`, and will
+  repoint automatically if Google ships a 3.1 Pro.
 - **Gemini models return JPEG only** — no Google API accepts `image/png`. GPT Image 2 returns
   PNG. nanaban corrects the output file extension to match the actual bytes.
 
@@ -190,7 +190,7 @@ nanaban detects credentials in this order and routes automatically. **Any single
 | `~/.codex/auth.json` (Codex OAuth) | `gpt-image-2` at $0 | `codex login` |
 | `OPENROUTER_API_KEY` env | `nb2`, `nb-lite`, `gpt-image-2` (2K) | env var |
 | Stored OpenRouter key | same as above | `nanaban auth set-openrouter <key>` |
-| `GEMINI_API_KEY` / `GOOGLE_API_KEY` | `nb2`, `nb-lite`, `nb-pro` — **the only path to Pro and the most reliable path to 4K** | env var |
+| `GEMINI_API_KEY` / `GOOGLE_API_KEY` | `nb2`, `nb-lite` — **the most reliable path to 4K** | env var |
 | Stored Gemini key | same as above | `nanaban auth set <key>` |
 
 ### Routing policy
@@ -207,7 +207,7 @@ nanaban detects credentials in this order and routes automatically. **Any single
 nanaban "prompt"                          # auto-picks best model for your auth
 nanaban "prompt" -o sunset.png            # custom filename
 nanaban "prompt" --ar wide --size 2k      # 16:9, high resolution (Gemini only)
-nanaban "prompt" --model pro              # Nano Banana Pro (needs a Gemini key)
+nanaban "prompt" --model lite             # Nano Banana 2 Lite (fastest, cheapest)
 nanaban "prompt" --model gpt-image-2      # force GPT Image 2 (needs Codex auth)
 nanaban "prompt" --model gpt              # force GPT Image 2 (latest GPT image model)
 nanaban "prompt" --via codex-oauth        # force the ChatGPT sub route
@@ -225,7 +225,7 @@ nanaban upscale photo.png --scale 2          # upscale (real SR or labeled re-re
 | `--ar <ratio>` | Aspect ratio (see table below) | `1:1` |
 | `--size <size>` | Resolution: `0.5k` `1k` `2k` `4k`. Selects a route that can deliver it. | `1k` |
 | `--quality <level>` | `low` `medium` `high`. Explicit `medium`/`high` excludes the free Codex route, which forces `low`. | model default |
-| `--model <id>` | `gpt-image-2`, `nb2`, `nb-lite`, `nb-pro` — or any family alias (see Naming) | auto (resolution/aspect decide) |
+| `--model <id>` | `gpt-image-2`, `nb2`, `nb-lite` — or any family alias (see Naming) | auto (resolution/aspect decide) |
 | `--via <transport>` | `codex-oauth`, `gemini-direct`, `openrouter` | auto |
 | `--neg <text>` | Negative prompt (Gemini only) | |
 | `-r, --ref <file>` | Reference image (style/content guidance) | |

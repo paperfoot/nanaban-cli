@@ -25,7 +25,7 @@ resolves to the newest model in that family** — you never need to know version
 | `gpt`, `gpt image`, `openai`, `chatgpt` | GPT Image 2 |
 | `nb`, `nano banana`, `full`, `flash` | Nano Banana 2 |
 | `lite` | Nano Banana 2 Lite |
-| `pro` | Nano Banana Pro |
+| `pro` | Nano Banana 2 — there is no current Pro tier; `pro` means "the best available" |
 
 Omit `--model` unless the user named one. The router picks for you.
 

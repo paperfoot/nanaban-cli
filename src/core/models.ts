@@ -6,9 +6,9 @@ export type TransportId = 'gemini-direct' | 'openrouter' | 'codex-oauth';
 /**
  * Capabilities are a property of a ROUTE (model × transport), never of a model.
  * The same model behaves very differently depending on how it is reached — e.g.
- * Nano Banana Pro renders true 4K on gemini-direct but is pinned to 1376x768 on
- * OpenRouter, and GPT Image 2 is flexible on a metered route but locked to a
- * fixed pixel budget on the free Codex bridge. Declaring one flat capability set
+ * Nano Banana renders true 4K on gemini-direct but only up to 2K from
+ * OpenRouter's stable ids, and GPT Image 2 is flexible on a metered route but
+ * locked to a fixed pixel budget on the free Codex bridge. Declaring one flat capability set
  * per model is what made `--size 4k` unreachable and made agents plan around
  * limits that did not exist.
  */
@@ -128,6 +128,11 @@ export const MODELS: ModelInfo[] = [
     aliases: [
       'nb', 'nb2', 'nano', 'nanobanana', 'nano-banana', 'nano-banana-2', 'banana',
       'flash', 'full', 'nb-full', 'nanobananafull',
+      // `pro` lands here too. Nano Banana Pro is Gemini 3 Pro Image — a whole
+      // generation behind this model's Gemini 3.1, and it was removed in v7.
+      // "pro" means "the best current Nano Banana", so it points at whatever
+      // that is today; repoint it if Google ships a 3.1 Pro.
+      'pro', 'nb-pro', 'nb2-pro', 'nanobananapro', 'nano-banana-pro',
     ],
     routes: {
       'gemini-direct': {
@@ -158,35 +163,6 @@ export const MODELS: ModelInfo[] = [
         notes: '4K is served by the -preview provider id; 1K/2K by the stable id. Both verified 2026-07-23.',
       },
     },
-  },
-  {
-    id: 'nb-pro',
-    // Renamed from `nb2-pro` in v6: this is Nano Banana **Pro** (Gemini 3 Pro
-    // Image). There is no "Nano Banana 2 Pro" — the old id implied a model that
-    // does not exist.
-    display: 'Nano Banana Pro',
-    family: 'gemini',
-    aliases: ['pro', 'nb-pro', 'nb2-pro', 'nanobananapro', 'nano-banana-pro'],
-    routes: {
-      'gemini-direct': {
-        providerModel: 'gemini-3-pro-image',
-        aspectRatios: STD_RATIOS,
-        sizes: ['1K', '2K', '4K'],
-        maxRefImages: 14,
-        edit: true,
-        aspectExact: true,
-        costPerImageUsd: 0.134,
-        billing: 'metered',
-        lifecycle: 'stable',
-        notes: 'True 4K verified 2026-07-23 (16:9 → 5504x3072). ~$0.24 at 4K.',
-      },
-      // Deliberately NO openrouter route. Live-verified 2026-07-23: OpenRouter
-      // pins this model to 1376x768 at EVERY requested size (5/5 runs, stable and
-      // preview ids alike) while charging the full 2K/4K price — a silent
-      // downgrade that bills up to $0.24 for a ~1 MP image. Pro requires a
-      // Gemini key so the resolution you ask for is the resolution you get.
-    },
-    notes: 'Requires a Gemini API key — the OpenRouter route silently downgrades to 1376x768 and is not offered.',
   },
   {
     id: 'nb-lite',
