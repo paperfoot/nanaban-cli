@@ -1,8 +1,8 @@
 {
   "name": "nanaban",
-  "version": "5.1.0",
+  "version": "6.0.0",
   "type": "module",
-  "description": "Image generation from the terminal — GPT Image 2 (free on ChatGPT Plus/Pro via Codex OAuth), Nano Banana 2/Lite/Pro (Gemini), and GPT-5.x Image, routed through one CLI.",
+  "description": "Image generation from the terminal — GPT Image 2 (free on ChatGPT Plus/Pro via Codex OAuth) and Nano Banana 2/Lite/Pro (Gemini) with true 4K, routed through one CLI.",
   "bin": {
     "nanaban": "./bin/nanaban.mjs"
   },
@@ -12,7 +12,9 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node --import tsx/esm --test tests/*.test.mts",
+    "test": "npx tsc --noEmit && node --import tsx/esm --test tests/*.test.mts",
+    "typecheck": "tsc --noEmit",
+    "sync:skill": "node scripts/sync-skill.mjs",
     "build:binaries": "./scripts/build-binaries.sh"
   },
   "keywords": [
