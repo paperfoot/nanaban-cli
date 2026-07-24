@@ -46,7 +46,16 @@ export async function saveImage(buffer: Buffer, opts: SaveOptions): Promise<stri
 
   try {
     if (opts.outputPath) {
-      const filePath = path.resolve(dir, opts.outputPath);
+      // Reconcile the extension with what the bytes actually are. Providers pick
+      // the encoding, not the caller: Gemini returns JPEG only, so `-o hero.png`
+      // used to produce a file named .png containing JPEG data, which breaks
+      // anything that trusts the extension. Honour the caller's stem and
+      // directory, correct only a mismatched extension.
+      let filePath = path.resolve(dir, opts.outputPath);
+      const given = path.extname(filePath).toLowerCase();
+      if (given !== ext) {
+        filePath = filePath.slice(0, filePath.length - given.length) + ext;
+      }
       await fs.mkdir(path.dirname(filePath), { recursive: true });
       await writeAtomic(filePath, buffer, false);
       return filePath;
